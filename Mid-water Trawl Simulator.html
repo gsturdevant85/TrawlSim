@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mid-water Trawl Simulator</title>
+<style>
+  :root{
+    --deck:#0a1014;        /* console body */
+    --deck-2:#0e181e;      /* raised panel */
+    --hair:#1c2c33;        /* hairline dividers */
+    --phos:#7ff0c8;        /* phosphor readout */
+    --phos-dim:#3d6a5c;    /* dim label */
+    --amber:#ffb454;       /* warnings / accents */
+    --red:#ff5a52;         /* alarm */
+    --ink:#dfeef0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #12232b 0%, var(--deck) 60%),
+      var(--deck);
+    color:var(--ink);
+    font-family:"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
+    display:flex;align-items:center;justify-content:center;
+    height:100%;overflow:hidden;padding:0;
+    -webkit-font-smoothing:antialiased;
+  }
+  .console{
+    width:900px;transform-origin:center center;
+    background:linear-gradient(180deg,var(--deck-2),#091115);
+    border:1px solid var(--hair);
+    border-radius:14px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.03);
+    overflow:hidden;
+  }
+  .topbar{
+    display:flex;align-items:center;gap:14px;
+    padding:10px 14px;border-bottom:1px solid var(--hair);
+    background:linear-gradient(180deg,#0f1c22,#0b1418);
+  }
+  .brand{display:flex;align-items:baseline;gap:8px;letter-spacing:.14em;}
+  .brand b{color:var(--phos);font-weight:600;font-size:13px;}
+  .brand span{color:var(--phos-dim);font-size:10px;letter-spacing:.24em;}
+  .freq{margin-left:auto;color:var(--phos-dim);font-size:10px;letter-spacing:.18em;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--phos);box-shadow:0 0 8px var(--phos);animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+  .readouts{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(98px,1fr));
+    border-bottom:1px solid var(--hair);
+  }
+  .cell{padding:8px 12px;border-right:1px solid var(--hair);}
+  .cell:last-child{border-right:0;}
+  .cell .k{color:var(--phos-dim);font-size:9px;letter-spacing:.18em;text-transform:uppercase;}
+  .cell .v{color:var(--phos);font-size:17px;margin-top:3px;font-variant-numeric:tabular-nums;}
+  .cell .v small{font-size:10px;color:var(--phos-dim);margin-left:2px;}
+  #integrityCell .v{color:var(--phos);}
+  #integrityCell.warn .v{color:var(--amber);}
+  #integrityCell.danger .v{color:var(--red);}
+
+  .stage{position:relative;background:#000;}
+  canvas{display:block;width:100%;height:auto;image-rendering:auto;touch-action:none;}
+
+  .overlay{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(600px 400px at 50% 40%, rgba(10,20,26,.72), rgba(3,7,9,.94));
+    text-align:center;padding:24px;
+  }
+  .overlay.hidden{display:none;}
+  .card{max-width:520px;}
+  .card h1{
+    font-size:22px;letter-spacing:.06em;margin:0 0 4px;color:var(--ink);font-weight:600;
+  }
+  .card .sub{color:var(--phos);font-size:11px;letter-spacing:.28em;text-transform:uppercase;margin-bottom:18px;}
+  .card p{color:#9fb4b8;font-size:13px;line-height:1.6;margin:10px 0;}
+  .keys{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:16px 0 20px;}
+  .keys kbd{
+    background:#0d1a20;border:1px solid var(--hair);border-bottom-color:#050b0e;
+    color:var(--phos);border-radius:6px;padding:5px 9px;font-size:12px;min-width:22px;display:inline-block;
+  }
+  .keys .lbl{color:var(--phos-dim);font-size:11px;align-self:center;}
+  button.start{
+    background:var(--phos);color:#04120d;border:0;border-radius:8px;
+    font-family:inherit;font-weight:600;letter-spacing:.1em;
+    padding:12px 26px;font-size:13px;cursor:pointer;text-transform:uppercase;
+    box-shadow:0 6px 20px rgba(127,240,200,.25);transition:transform .08s;
+  }
+  button.start:active{transform:translateY(1px);}
+  .final{color:var(--amber);font-size:15px;letter-spacing:.1em;margin:6px 0 2px;}
+
+  /* ---- briefing intro ---- */
+  #introScreen{ padding:0; }
+  .introWrap{ display:flex; gap:14px; width:100%; height:100%; padding:20px 22px 60px; }
+  .crawl{ position:relative; flex:1 1 auto; overflow:hidden; }
+  .crawl .scroller{
+    position:absolute; left:0; right:0; top:0; padding-right:10px;
+    will-change:transform;
+  }
+  .crawl .brief-h{ color:var(--phos); font-size:12px; letter-spacing:.18em; margin-bottom:14px; }
+  .crawl .brief-sig{ color:var(--amber); font-size:11px; letter-spacing:.14em; margin-top:16px; }
+  .crawl p{ color:#c4d4d6; font-size:14px; line-height:1.7; margin:0 0 13px; text-align:left; }
+  .crawl p b{ color:#eafff6; font-weight:600; }
+  .crawl-fade-top,.crawl-fade-bot{ position:absolute; left:0; right:0; height:40px; pointer-events:none; }
+  .crawl-fade-top{ top:0;   background:linear-gradient(180deg, rgba(4,9,12,.96), rgba(4,9,12,0)); }
+  .crawl-fade-bot{ bottom:0; background:linear-gradient(0deg,  rgba(4,9,12,.96), rgba(4,9,12,0)); }
+  .officerWrap{ flex:0 0 30%; max-width:210px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; }
+  .officerWrap canvas{ width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges;
+    filter:drop-shadow(0 6px 14px rgba(0,0,0,.5)); }
+  .officer-cap{ margin-top:8px; color:var(--phos-dim); font-size:9px; letter-spacing:.2em; text-align:center; }
+  .intro-btn{ position:absolute; bottom:16px; left:50%; transform:translateX(-50%); }
+  .intro-btn:active{ transform:translateX(-50%) translateY(1px); }
+  /* static debrief text (congrats screen) */
+  #congratsScreen .introWrap{ padding-bottom:64px; }
+  .debrief{ flex:1 1 auto; align-self:center; max-height:100%; overflow:auto; padding-right:8px; }
+  .debrief .brief-h{ color:var(--phos); font-size:12px; letter-spacing:.18em; margin-bottom:14px; }
+  .debrief .brief-sig{ color:var(--amber); font-size:11px; letter-spacing:.14em; margin-top:16px; }
+  .debrief p{ color:#c4d4d6; font-size:14px; line-height:1.7; margin:0 0 13px; }
+  .debrief p b{ color:#eafff6; }
+  @media (max-width:560px){
+    .crawl p{ font-size:12px; line-height:1.6; }
+    .debrief p{ font-size:12px; line-height:1.6; }
+    .officerWrap{ flex-basis:34%; }
+  }
+
+  .footnote{padding:8px 14px;border-top:1px solid var(--hair);color:var(--phos-dim);font-size:10px;letter-spacing:.1em;display:flex;gap:16px;flex-wrap:wrap;}
+</style>
+</head>
+<body>
+  <div class="console">
+    <div class="topbar">
+      <div class="dot"></div>
+      <div class="brand"><b>SEAVIEW&nbsp;38</b><span>ECHOSOUNDER</span></div>
+      <div class="freq">38&nbsp;kHz · DOWN</div>
+    </div>
+
+    <div class="readouts">
+      <div class="cell"><div class="k">Landed</div><div class="v" id="rScore">0</div></div>
+      <div class="cell"><div class="k">Target</div><div class="v" id="rBag">—</div></div>
+      <div class="cell"><div class="k">Net depth</div><div class="v" id="rNet">—<small>m</small></div></div>
+      <div class="cell"><div class="k">Seabed</div><div class="v" id="rBed">—<small>m</small></div></div>
+      <div class="cell" id="integrityCell"><div class="k">Gear</div><div class="v" id="rInt">100<small>%</small></div></div>
+      <div class="cell"><div class="k">Time</div><div class="v" id="rTime">0:00</div></div>
+    </div>
+
+    <div class="stage">
+      <canvas id="c" width="900" height="540"></canvas>
+
+<!--SCROLLING INTRO TEXT -->
+
+      <div class="overlay" id="introScreen">
+        <div class="introWrap">
+          <div class="crawl">
+            <div class="scroller" id="crawlText">
+              <div class="brief-h">/// NOAA CORPS — OPERATIONS BRIEFING ///</div>
+              <p>Good morning, Ensign. Welcome aboard.</p>
+              <p>We're running an acoustic-trawl survey for walleye <b>Pollock</b>. To control the net for our midwater trawl, use the Seaview 38 echsounder system to locate and capture fish.</p>
+              <p>The echsounder will show you what is directly below <i>Oscar Dyson</i>.</p>
+              <p>Familiarize yourself with the trends you are likely to see..</p>
+	     <p><b>SS1:</b> a thin, scattered speckle of adults throughout the water column. There are fish to be caught, but it can take a while to fill the cod-end! </p>
+              <p><b>SS2:</b> tall bright ribbons of juveniles between 2-3 years old; drop the net on those and the net fills fast.</p>
+              <p><b>SS3:</b> clear water. Keep searching.</p>
+              <p>Fly the net on the <b>warp</b>: pay out wire to sink it, haul in to raise it. <b>Tow speed</b> only trims the depth — and decides how quickly the marks come at you.</p>
+              <p>The science team needs <span id="briefQuota">a quota</span> Pollock in the cod-end — and the clock is running, so land them <b>as fast as you can</b>. Keep the footrope off the bottom: plough the seabed and you'll part the gear, and the tow is lost.</p>
+              <p>That's the job; good hunting.</p>
+              <div class="brief-sig">— OFFICER OF THE DECK, NOAA CORPS</div>
+            </div>
+            <div class="crawl-fade-top"></div>
+            <div class="crawl-fade-bot"></div>
+          </div>
+          <div class="officerWrap">
+            <canvas id="officerCanvas" width="156" height="210"></canvas>
+            <div class="officer-cap">OOD · NOAA CORPS</div>
+          </div>
+        </div>
+        <button class="start intro-btn" id="briefBtn">Report to station →</button>
+      </div>
+
+<!-- HOME SCREEN -->
+
+      <div class="overlay hidden" id="startScreen">
+        <div class="card">
+          <div class="sub">Pelagic Trawl Simulator</div>
+          <h1>Read the water. Set your net. Fill the bag.</h1>
+          <p>Set the net's depth mainly with the <b>warp</b> — pay out wire to lower it, haul in to raise it using the up/down arrows. </p>
+          <p>Change the <b>Tow speed</b> using the left/right arrows to adjust your scroll speed and trim the net elevation. The gear is heavy, so it answers the controls slowly. You'll need to plan ahead.</p>
+
+          <div class="keys">
+            <span class="lbl">Warp — raise / lower net</span><kbd>↑</kbd><kbd>↓</kbd>
+            <span class="lbl">Speed — slower / faster</span><kbd>←</kbd><kbd>→</kbd>
+            <span class="lbl">or swipe ⇕ net / ⇔ speed ·</span><kbd>P</kbd><span class="lbl">pause</span>
+          </div>
+          <button class="start" id="startBtn">Shoot the net</button>
+        </div>
+      </div>
+
+      <div class="overlay hidden" id="overScreen">
+        <div class="card">
+          <div class="sub" id="overSub">Gear parted</div>
+          <h1 id="overTitle">The trawl is wrecked.</h1>
+          <div class="final" id="finalScore">Catch landed: 0 Pollock</div>
+          <p id="overMsg">You dragged the footrope through the seabed one too many times.</p>
+          <button class="start" id="againBtn">Shoot new gear</button>
+        </div>
+      </div>
+
+      <div class="overlay hidden" id="congratsScreen">
+        <div class="introWrap">
+          <div class="debrief">
+            <div class="brief-h">/// NOAA CORPS — MISSION DEBRIEF ///</div>
+            <p>Outstanding tow, Ensign.</p>
+            <p id="congratsLine">You brought the full quota over the gate without parting the gear.</p>
+            <p>The science team has their sample and we can get back on transit. That's exactly how it's done — clean, efficient, and on target.</p>
+            <div class="brief-sig">— OFFICER OF THE DECK, NOAA CORPS</div>
+          </div>
+          <div class="officerWrap">
+            <canvas id="officerCanvas2" width="156" height="210"></canvas>
+            <div class="officer-cap">OOD · NOAA CORPS</div>
+          </div>
+        </div>
+        <button class="start intro-btn" id="newTowBtn">Fish again →</button>
+      </div>
+    </div>
+
+    <div class="footnote">
+      <span>TVG 20log R</span>
+      <span id="fnPattern">MARK —</span>
+      <span id="fnStatus">SEARCHING</span>
+    </div>
+  </div>
+
+<!-- SET UP THE GAME WINDOW-->
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const SKY = 116;                   // px of above-water band (vessel + dials + surface)
+  const W = canvas.width;            // 900
+  const ECHO_H = 450;                // echogram pixel height (shorter → fits browsers better)
+  canvas.height = SKY + ECHO_H;      // grow the view to fit the vessel
+  const H = canvas.height;
+  const DEPTH_MAX = 150;             // metres shown top→bottom of the echogram
+  const ppm = ECHO_H / DEPTH_MAX;    // pixels per metre (=3)
+  const mToY = m => SKY + m * ppm;   // depth (m) → screen y
+  const yToM = y => (y - SKY) / ppm; // screen y → depth (m)
+
+<!-- PRE-BUILD THE ECHOGRAM -->
+
+  // ---- offscreen echogram buffer (its own y=0 is depth 0) ----
+  const echo = document.createElement('canvas');
+  echo.width = W; echo.height = ECHO_H;
+  const ectx = echo.getContext('2d', { willReadFrequently:false });
+  const colImg = ectx.createImageData(1, ECHO_H);
+  ectx.fillStyle = '#000'; ectx.fillRect(0,0,W,ECHO_H);
+
+  // ---- helpers ----
+  const clamp = (v,a,b) => v<a?a:v>b?b:v;
+  const clamp01 = v => v<0?0:v>1?1:v;
+
+<!-- DEFINE COLOR PALETTES -->
+
+  // Standard "jet" colormap, v in [0,1]
+  function jet(v){
+    const f = v*4;
+    const r = clamp01(Math.min(f-1.5, -f+4.5));
+    const g = clamp01(Math.min(f-0.5, -f+3.5));
+    const b = clamp01(Math.min(f+0.5, -f+2.5));
+    return [r, g, b];
+  }
+  // jet + darkening of near-zero echoes so open water reads dark
+  function shade(v, out, o){
+    v = v<0?0:v>1?1:v;
+    const c = jet(v);
+    const k = v/0.12; const bright = 0.14 + 0.86*(k>1?1:k);
+    out[o]   = c[0]*255*bright;
+    out[o+1] = c[1]*255*bright;
+    out[o+2] = c[2]*255*bright;
+    out[o+3] = 255;
+  }
+
+<!-- MAKE THE SEAFLOOR -->
+
+  // Smooth, slowly-varying seabed between 50 and 146 m
+  function seabed(wx){
+    const t = wx * 0.0016;
+    let d = 100
+      + 40*Math.sin(t*0.5 + 0.4)
+      + 18*Math.sin(t*1.25 + 1.1)
+      + 7 *Math.sin(t*3.3 + 2.5);
+    return clamp(d, 50, 146);
+  }
+
+<!-- DEFINE MUNGE VOLUME-->
+
+  // Near-surface noise layer. Its underside drifts slowly like the seabed but never
+  // reaches more than 2/5 of the way down the water column.
+  function noiseBottom(wx){
+    const t = wx*0.0016;
+    const d = 20 + 13*Math.sin(t*0.6 + 1.7) + 6*Math.sin(t*1.9 + 0.4);
+    return clamp(d, 3, 0.4*seabed(wx));
+  }
+
+<!-- DEFINE MUNGE DENSITY -->
+
+  // How much of that band is actually noisy right now: drifts between clear and near-solid.
+  function noiseCoverage(wx){
+    const t = wx*0.0016;
+    const c = 0.6*Math.sin(t*0.85 + 0.2) + 0.5*Math.sin(t*2.3 + 2.1);
+    return clamp(c*1.3 + 0.1, 0, 1);   // lingers at 0 (clear) and near 1 (full noise)
+  }
+
+<!-- DEFINE START STATE -->
+
+  // ---- world state ----
+  let worldX = 0;          // world column index at the RIGHT edge
+  let schools = [];        // "reflectors": individual fish or schools, all Gaussian blobs
+  let spawnCursor = 0;
+
+<!-- LET'S MAKE SOME FISH -->
+
+  // ---- Pollock schooling regimes ----
+  //  SS1: dispersed, non-clumped scatter of larger fish across the lower water column
+  //  SS2: narrow, vertically-elliptical schools of juveniles
+  //  SS3: almost empty water
+  const REGIMES = ['SS1','SS2','SS3'];
+  let regime = 'SS1';
+  let regimeTimer = 30;    // seconds until the pattern shifts
+  const REGIME_W = { SS1:5, SS2:5, SS3:1.4 };   // SS3 is picked far less often
+  function pickRegime(prev){
+    const opts = REGIMES.filter(r => r !== prev);
+    let tot = 0; for (const r of opts) tot += REGIME_W[r];
+    let x = Math.random()*tot;
+    for (const r of opts){ x -= REGIME_W[r]; if (x <= 0) return r; }
+    return opts[opts.length-1];
+  }
+  // SS3 (empty water) also gets shorter stints than the fishing patterns
+  const regimeDuration = r => r === 'SS3' ? 8 + Math.random()*9 : 20 + Math.random()*25;
+
+  // fish = number of Pollock in the reflector; grab = how readily the net gathers them
+  function pushMark(x, depth, rx, ry, strength, fish, grab){
+    const s = { wx:x, depth, rx, ry, strength, grab };
+    s.xoff = Math.random()*2 - 1;          // across-track position (fixed) for the net sonde
+    s.maxBiomass = fish; s.biomass = fish;
+    schools.push(s);
+  }
+
+  // one spawn event at world position x, shaped by the active regime
+  function spawnMark(x){
+    const bed = seabed(x), surf = 27;
+    if (regime === 'SS3'){
+      if (Math.random() < 0.16){                      // the odd stray target
+        const depth = clamp(surf+10 + Math.random()*(bed-surf-20), surf+4, bed-3);
+        pushMark(x, depth, 6+Math.random()*8, 1.6+Math.random()*2, 0.2+Math.random()*0.22, 2+Math.random()*3, 1);
+      }
+      return;
+    }
+
+<!-- SS1 SCHOOLS -->
+
+    if (regime === 'SS1'){
+      // adults as tiny, widely scattered point targets; may reach up to the noise underside
+      const top = noiseBottom(x) + 1;
+      const depth = clamp(top + Math.random()*(bed - top - 2), top, bed-2);
+      pushMark(x, depth,
+        0.7 + Math.random()*1.1,      // barely a handful of pixels across
+        0.4 + Math.random()*0.7,      // tiny vertically
+        0.725 + Math.random()*0.3,      // moderate echo
+        2 + Math.random()*5,          // only a few fish each
+        3.5);                         // slow to gather (upped 2x)
+      return;
+    }
+
+<!-- SS2 SCHOOLS -->
+
+    // SS2: tight juvenile schools — tall, thin, bright, and quick to fill the net
+    const depth = clamp(surf+8 + Math.random()*(bed - surf - 16), surf+5, bed-4);
+    pushMark(x, depth,
+      3 + Math.random()*5,            // narrow
+      9 + Math.random()*17,           // vertically elliptical (tall)
+      0.82 + Math.random()*0.18,      // bright echo
+      10 + Math.random()*50,          // dense with fish
+      5.0);                           // gathers much faster than SS1 (upped 2x)
+  }
+
+  // spacing between spawn events, per regime
+  function nextGap(){
+    if (regime === 'SS1') return 20 + Math.random()*44;    // much more disperse scatter
+    if (regime === 'SS2') return 55 + Math.random()*170;   // spaced schools
+    return 130 + Math.random()*280;                        // SS3: near-empty
+  }
+
+  function spawnStep(){ spawnCursor += nextGap(); spawnMark(spawnCursor); }
+  function ensureSchools(){
+    while (spawnCursor < worldX + 220) spawnStep();        // small lead → crisp transitions
+    if (schools.length > 400) schools = schools.filter(s => s.wx > worldX - 60);
+  }
+
+
+<!-- SIDESCROLLING ECHOGRAM -->
+
+  // ---- echogram column synthesis ----
+  const activeMarks = [];   // reflectors overlapping the column currently being drawn
+
+  function drawColumn(sx, wx){
+    const bed = seabed(wx);
+    const nb  = noiseBottom(wx);      // underside of the near-surface noise band
+    const nc  = noiseCoverage(wx);    // 0 = clear, 1 = near-solid noise
+
+    // prefilter: only reflectors whose horizontal footprint touches this column
+    activeMarks.length = 0;
+    for (let i=0;i<schools.length;i++){
+      const s = schools[i];
+      const dx = (wx - s.wx)/s.rx;
+      if (dx < -3 || dx > 3) continue;
+      s._dx2  = dx*dx;
+      s._frac = s.maxBiomass ? s.biomass/s.maxBiomass : 0;
+      activeMarks.push(s);
+    }
+    const nA = activeMarks.length;
+
+    const d = colImg.data;
+    for (let y=0;y<ECHO_H;y++){
+      const depth = y/ppm;
+      let v;
+      if (depth < nb){
+        // patchy full-spectrum noise: denser near the surface, thinning toward the band's underside
+        const edge = 1 - depth/nb;                         // 1 at surface → 0 at underside
+        const p = nc * (0.3 + 0.7*edge);
+        v = (Math.random() < p) ? Math.random() : (0.02 + Math.random()*0.03);
+      } else {
+        v = 0.02 + Math.random()*0.03;                     // faint volume backscatter
+        if (Math.random() < 0.0007) v += 0.3 + Math.random()*0.5;
+        for (let k=0;k<nA;k++){
+          const s = activeMarks[k];
+          const dy = (depth - s.depth)/s.ry;
+          const d2 = s._dx2 + dy*dy;
+          if (d2 < 9){
+            v += s.strength * Math.exp(-d2) * (0.55 + 0.45*Math.random()) * (0.35 + 0.65*s._frac);
+          }
+        }
+        const rel = depth - bed;
+        if (rel > -1.3 && rel < 1.3){
+          v = Math.max(v, 0.92 + 0.08*Math.random());      // hard bottom return
+        } else if (rel >= 1.3 && rel < 9){
+          v = Math.max(v, (0.72 - (rel-1.3)*0.075) * (0.7 + 0.3*Math.random())); // sub-bottom
+        } else if (rel >= 9){
+          v = 0;                                           // below penetration
+        }
+      }
+      shade(v, d, y*4);
+    }
+    ectx.putImageData(colImg, sx, 0);
+  }
+
+<!-- LET's MAKE A NET! -->
+
+  // ---- net / gear ----
+  const NET_X = 616;              // fixed screen column of the trawl mouth
+  const NET_H = 12;               // vertical opening, metres
+  let netTop = 60;                // metres to top of opening
+  let targetTop = 60;
+
+<!-- TOW SPEED MECHANIC -->
+
+  // ---- tow speed ----
+  const SPD_MIN = 1.2, SPD_MAX = 4.4;   // knots
+  let speed = 2.6;
+  const setSpeed = v => { speed = clamp(v, SPD_MIN, SPD_MAX); };
+  const speedFrac = () => (speed - SPD_MIN) / (SPD_MAX - SPD_MIN);   // 0..1
+  const scrollPxFor = () => 40 + speedFrac() * 118;                 // 40..158 px/s
+  // faster tow trims the net up a touch, slower lets it settle — but only a touch
+  const SPEED_AUTH = 42;                                   // total depth trim from speed (m)
+  const speedTrim = () => (0.5 - speedFrac()) * SPEED_AUTH; // +21 m slow … −21 m fast
+
+<!-- WARP MECHANIC -->
+
+  // ---- warp (wire paid out) — the primary depth control ----
+  const SCOPE = 3.3;                    // wire length : net depth (for the readout)
+  const WD_MIN = 26, WD_MAX = 148;      // net depth (m) the warp can command
+  const WARP_RATE = 22;                 // depth metres/second while spooling
+  let warpDepth = 96;                   // net depth commanded by the current warp
+  const warpWire = () => Math.round(clamp(warpDepth,WD_MIN,WD_MAX)*SCOPE/5)*5; // wire, m
+  // commanded mouth-top: warp sets the depth, speed only nudges it
+  const commandedTop = () => clamp(warpDepth, WD_MIN, WD_MAX) + speedTrim() - NET_H/2;
+
+  let quota = 400;                // Pollock to land (constant)
+  let score = 0;                  // Pollock in the cod-end so far
+  let towTime = 0;                // seconds elapsed this tow (pauses when paused)
+  let bestTime = null;            // best (fastest) completed tow this session
+  const CATCH_K = 28;             // base catch scale (fish per second at a full mouth)
+  let integrity = 100;
+  let snagFlash = 0;
+  const progress = () => quota ? clamp(score/quota, 0, 1) : 0;
+
+  const netWorldX = () => worldX - (W - NET_X);
+
+  function updateGear(dt){
+    // net eases toward the commanded depth — heavy gear, slow to respond
+    netTop += (targetTop - netTop) * Math.min(1, dt*1.5);
+
+    const nwx = netWorldX();
+    const bed = seabed(nwx);
+    // clamp: can't rise above the shallow gear limit, can't bury below bed+3
+    const minTop = 14, maxTop = bed + 3 - NET_H;
+    netTop = clamp(netTop, minTop, maxTop);
+    targetTop = clamp(targetTop, minTop, maxTop);
+
+    const netBot = netTop + NET_H;
+
+    // catch: reflectors at the mouth column, overlapping the opening. Rate scales with how
+    // much of the mouth the reflector fills, its echo strength, and its grab factor.
+    for (let i=0;i<schools.length;i++){
+      const s = schools[i];
+      if (s.biomass <= 0) continue;
+      const capW = Math.max(4, s.rx);                         // tiny reflectors still get a window
+      if (Math.abs(s.wx - nwx) > capW) continue;
+      const sTop = s.depth - s.ry*1.5, sBot = s.depth + s.ry*1.5;
+      const oTop = Math.max(sTop, netTop), oBot = Math.min(sBot, netBot);
+      const overlap = oBot - oTop;
+      if (overlap > 0){
+        const overlapFrac = Math.min(overlap / NET_H, 1);     // 0..1 of the mouth
+        const rate = overlapFrac * s.strength * CATCH_K * s.grab * (0.5 + 0.75*speedFrac()); // fish/s
+        const caught = Math.min(rate * dt, s.biomass);
+        s.biomass -= caught;
+        score += caught;
+      }
+    }
+
+    // landed the quota → tow complete
+    if (score >= quota){ score = quota; endGame('win'); return; }
+
+    // bottom contact: footrope in or below the seabed tears the gear
+    bottomContact = netBot > bed - 0.5;
+    if (netBot > bed){
+      integrity -= dt * 42;
+      snagFlash = 1;
+      if (integrity <= 0){ integrity = 0; endGame('gear'); }
+    }
+  }
+  let bottomContact = false;
+
+  // ---- rendering (main canvas) ----
+  function drawGridAndAxis(){
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.textBaseline = 'middle';
+    for (let m=20; m<DEPTH_MAX; m+=20){
+      const y = mToY(m) + 0.5;
+      ctx.strokeStyle = 'rgba(127,240,200,0.10)';
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+      ctx.fillStyle = 'rgba(127,240,200,0.55)';
+      ctx.fillText(m+' m', 6, y);
+    }
+    ctx.restore();
+  }
+
+  function drawColorbar(){
+    const x = W-16, y0=SKY+14, h=150, w=9;
+    for (let i=0;i<h;i++){
+      const v = 1 - i/h;
+      const c = jet(v);
+      const k = v/0.12; const b = 0.14+0.86*(k>1?1:k);
+      ctx.fillStyle = `rgb(${c[0]*255*b|0},${c[1]*255*b|0},${c[2]*255*b|0})`;
+      ctx.fillRect(x, y0+i, w, 1);
+    }
+    ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.strokeRect(x-0.5,y0-0.5,w+1,h+1);
+    ctx.fillStyle='rgba(223,238,240,0.8)'; ctx.font='9px ui-monospace,monospace';
+    ctx.textAlign='right'; ctx.textBaseline='alphabetic';
+    ctx.fillText('strong', x-4, y0+8);
+    ctx.fillText('weak',  x-4, y0+h);
+    ctx.textAlign='left';
+  }
+
+  function dial(cx,cy,R,frac,label,val){
+    const a0 = Math.PI*0.75, sweep = Math.PI*1.5;   // 135°, 270° sweep (open bottom)
+    frac = clamp(frac,0,1);
+    ctx.save();
+    // face
+    ctx.beginPath(); ctx.arc(cx,cy,R+3,0,7); ctx.fillStyle='rgba(3,7,9,0.85)'; ctx.fill();
+    ctx.lineWidth=1.2; ctx.strokeStyle='rgba(127,240,200,0.3)'; ctx.stroke();
+    // track + value fill
+    ctx.lineWidth=4.5; ctx.strokeStyle='rgba(127,240,200,0.16)';
+    ctx.beginPath(); ctx.arc(cx,cy,R-4,a0,a0+sweep); ctx.stroke();
+    ctx.strokeStyle='rgba(127,240,200,0.85)';
+    ctx.beginPath(); ctx.arc(cx,cy,R-4,a0,a0+sweep*frac); ctx.stroke();
+    // ticks
+    ctx.strokeStyle='rgba(180,220,210,0.4)'; ctx.lineWidth=1.5;
+    for(let i=0;i<=4;i++){
+      const a=a0+sweep*(i/4);
+      ctx.beginPath();
+      ctx.moveTo(cx+(R-9)*Math.cos(a), cy+(R-9)*Math.sin(a));
+      ctx.lineTo(cx+(R-2)*Math.cos(a), cy+(R-2)*Math.sin(a));
+      ctx.stroke();
+    }
+    // needle (kept short so it clears the readout)
+    const na=a0+sweep*frac, nl=R*0.48;
+    ctx.strokeStyle='#ffb454'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+nl*Math.cos(na), cy+nl*Math.sin(na)); ctx.stroke();
+    ctx.fillStyle='#ffb454'; ctx.beginPath(); ctx.arc(cx,cy,3,0,7); ctx.fill();
+    // label above the dial; value readout inside the lower part of the circle
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.font='10px ui-monospace,monospace'; ctx.fillStyle='rgba(127,240,200,0.7)';
+    ctx.fillText(label, cx, cy-R-7);
+    ctx.font='bold 15px ui-monospace,monospace'; ctx.fillStyle='rgba(233,248,250,0.98)';
+    ctx.fillText(val, cx, cy+R*0.66);
+    ctx.restore();
+  }
+  function drawDials(){
+    const R=44, cy=SKY-52;                     // up in the sky band, above the waterline
+    const speedDial = 8 + R;                    // left-hand dial centre x
+    const warpDial = speedDial + (2*R+26);      // right-hand dial centre x
+    const warpFrac = (clamp(warpDepth,WD_MIN,WD_MAX)-WD_MIN)/(WD_MAX-WD_MIN);
+    dial(speedDial, cy, R, speedFrac(), 'SPEED', speed.toFixed(1)+' kt');
+    dial(warpDial,  cy, R, warpFrac,    'WARP',  warpWire()+' m');
+  }
+
+  // ---- vessel: 8-bit NOAA fisheries survey ship (bow to the right, towing astern) ----
+  const PS = 3, WLr = 21;               // pixel size; cell-row of the waterline
+  const VES_LEFT = W - 183;             // screen x of the art's left edge
+  const bobNow = () => Math.sin(performance.now()/900)*1.5;
+  // stern A-frame apex where the warps are made fast (cell 7, row 10)
+  const gantry = () => ({ x: VES_LEFT + 7*PS + PS/2, y: SKY + (10-WLr)*PS + bobNow() });
+
+  function drawSky(){
+    const g = ctx.createLinearGradient(0,0,0,SKY);
+    g.addColorStop(0, '#06121a');
+    g.addColorStop(1, '#0b2431');
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,SKY);
+    // waterline
+    ctx.strokeStyle = 'rgba(127,240,200,0.35)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, SKY+0.5); ctx.lineTo(W, SKY+0.5); ctx.stroke();
+    ctx.strokeStyle = 'rgba(127,240,200,0.10)';
+    ctx.beginPath(); ctx.moveTo(0, SKY+3.5); ctx.lineTo(W, SKY+3.5); ctx.stroke();
+    ctx.fillStyle = 'rgba(127,240,200,0.55)'; ctx.font='10px ui-monospace,monospace';
+    ctx.textBaseline='middle'; ctx.fillText('0 m', 6, SKY-8);
+  }
+
+  // palette
+  const C = {
+    hullW:'#eef1f2', hullK:'#161a1d', boot:'#0e1113',
+    sup:'#e7ebee', sup2:'#cbd3d7', win:'#22343d',
+    stack:'#2b333a', blue:'#2f7186', orange:'#e08a3c', orangeD:'#b96f2c',
+    mast:'#caa46e', dome:'#dfe6e8', boat:'#2b8a94', boatT:'#bfe0e2',
+    red:'#c0392b', flagB:'#2b4a8b', white:'#f6f8f9', dark:'#33414b'
+  };
+
+  function drawVessel(){
+    const bob = bobNow();
+    const L = VES_LEFT;
+    // px(cell x, cell y, w cells, h cells, color)
+    const px = (cx,cy,w,h,col)=>{ ctx.fillStyle=col; ctx.fillRect(L+cx*PS, SKY+(cy-WLr)*PS+bob, w*PS, h*PS); };
+
+    // --- hull (black underwater, shaped toward the keel) ---
+    px(6,22,40,1,C.hullK);
+    px(9,23,34,1,C.hullK);
+    px(13,24,23,1,C.hullK);
+    px(7,23,1,2,C.hullK);                 // rudder/skeg at stern
+    // --- white topsides ---
+    px(4,17,45,1,C.hullW);                // deck edge / bulwark
+    px(4,18,45,3,C.hullW);                // rows 18-20
+    px(4,21,45,1,C.boot);                 // boot-topping stripe at waterline
+    px(4,20,45,1,C.hullW);
+    // raked bow / forecastle rising to the right
+    px(45,15,4,2,C.hullW);
+    px(47,16,2,1,C.hullW);
+    px(48,17,1,1,C.hullW);
+    // portholes along the white hull
+    for (let cx=8; cx<=44; cx+=4) px(cx,19,1,1,C.dark);
+    // NOAA-blue sheer stripe under the deck edge
+    px(4,17,45,1,C.hullW);
+
+    // --- main deckhouse (aft-biased), leaving fore & aft deck open ---
+    px(14,12,24,5,C.sup);                 // main house rows 12-16
+    px(14,15,24,2,C.sup2);                // shaded lower band
+    for (let cx=16; cx<=36; cx+=2) px(cx,14,1,1,C.win);   // window row
+    px(16,9,20,3,C.sup);                  // 2nd deck rows 9-11
+    for (let cx=18; cx<=34; cx+=2) px(cx,10,1,1,C.win);
+    px(21,6,13,3,C.sup);                  // bridge rows 6-8
+    px(22,7,11,1,C.win);                  // wraparound bridge windows
+
+    // --- funnel with blue stripe (aft of the bridge) ---
+    px(34,3,4,6,C.stack);
+    px(34,4,4,1,C.blue);
+    px(34,3,4,1,'#11161a');
+
+    // --- main mast above the bridge: yards, radar dome, US flag ---
+    px(24,0,1,7,C.mast);                  // mast
+    px(21,2,7,1,C.mast);                  // upper yard
+    px(22,4,5,1,C.mast);                  // lower yard
+    px(25,3,2,1,C.dome);                  // radar dome
+    px(25,0,3,1,C.red);                   // flag stripes
+    px(25,1,3,1,C.white);
+    px(25,0,1,1,C.flagB);                 // flag canton
+
+    // --- orange gantries (stern A-frame + forward crane) ---
+    px(5,10,5,1,C.orange);                // stern A-frame top bar
+    px(5,10,1,7,C.orange);                // stern legs rows 10-16
+    px(9,10,1,7,C.orange);
+    px(5,10,5,1,C.orangeD);
+    px(40,12,5,1,C.orange);               // forward crane
+    px(40,12,1,5,C.orange);
+    px(44,12,1,5,C.orange);
+
+    // --- teal survey launch on the afterdeck ---
+    px(10,16,4,1,C.boat);
+    px(10,15,4,1,C.boatT);
+
+    // --- deck cranes/detail dabs ---
+    px(38,13,1,4,C.sup2);
+    px(12,13,1,4,C.sup2);
+  }
+
+  function drawNet(){
+    const yT = mToY(netTop), yB = mToY(netTop+NET_H);
+    const bag = NET_X - 96, bagY = (yT+yB)/2;
+    const alarm = bottomContact;
+    const line = alarm ? '#ff5a52' : '#eafff6';
+    const glow = alarm ? 'rgba(255,90,82,0.5)' : 'rgba(127,240,200,0.5)';
+    const fill = progress();
+
+    ctx.save();
+    // warps from the vessel's stern gantry down to the net mouth
+    const g = gantry();
+    ctx.strokeStyle='rgba(200,230,225,0.4)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(NET_X, yT); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(NET_X, yB); ctx.stroke();
+    // warp length tag, along the upper wire
+    ctx.save();
+    ctx.fillStyle='rgba(200,230,225,0.7)'; ctx.font='9px ui-monospace,monospace';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(warpWire()+' m warp', (g.x+NET_X)/2, (g.y+yT)/2 - 2);
+    ctx.restore();
+
+    // net panels: mouth -> cod-end
+    ctx.strokeStyle=glow; ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(NET_X,yT); ctx.lineTo(bag, bagY-9);
+    ctx.moveTo(NET_X,yB); ctx.lineTo(bag, bagY+9);
+    ctx.stroke();
+    // a little mesh
+    ctx.strokeStyle = alarm ? 'rgba(255,90,82,0.25)' : 'rgba(180,220,210,0.22)';
+    for (let t=0.18;t<1;t+=0.2){
+      const y1 = yT + (bagY-9-yT)*t, y2 = yB + (bagY+9-yB)*t;
+      const xx = NET_X + (bag-NET_X)*t;
+      ctx.beginPath(); ctx.moveTo(xx,y1); ctx.lineTo(xx,y2); ctx.stroke();
+    }
+
+    // cod-end bag, filling toward the quota
+    ctx.beginPath();
+    ctx.moveTo(bag, bagY-9);
+    ctx.quadraticCurveTo(bag-26, bagY, bag, bagY+9);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(255,${clamp(200-fill*180,20,200)|0},60,${0.2+fill*0.65})`;
+    ctx.fill();
+    ctx.strokeStyle=glow; ctx.stroke();
+
+    // mouth: headline float (top) + footrope weights (bottom)
+    ctx.lineWidth=2; ctx.strokeStyle=line;
+    ctx.beginPath(); ctx.moveTo(NET_X,yT); ctx.lineTo(NET_X,yB); ctx.stroke();
+    ctx.fillStyle=line;
+    ctx.beginPath(); ctx.moveTo(NET_X-5,yT-5); ctx.lineTo(NET_X+5,yT-5); ctx.lineTo(NET_X,yT); ctx.fill(); // float
+    ctx.beginPath(); ctx.arc(NET_X,yB+3,3,0,7); ctx.fill(); // weight
+    ctx.restore();
+  }
+
+  // ---- net-mounted downward sounder (picture-in-picture, FS70 style) ----
+  const jetRGB = v => { const c = jet(v); return [c[0]*255|0, c[1]*255|0, c[2]*255|0]; };
+  function roundRectP(x,y,w,h,r){
+    ctx.beginPath(); ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+  // rounded-trapezoid reflector: flat across the middle, rounded corners, legs rising to the sides.
+  // Now patchy — coherent runs of return broken by gaps, with per-patch brightness.
+  function trapBand(O, r, inten, maxR, seed){
+    const HW = maxR*0.32, slope = 1.18, corner = 7;
+    const prof=[0.12,0.35,0.62,0.9,1.0,0.9,0.62,0.35,0.12];
+    const step=2;
+    const hash = i => { const s = Math.sin(i*127.1 + seed*311.7)*43758.5453; return s - Math.floor(s); };
+    for(let dx=-maxR; dx<=maxR; dx+=step){
+      const gi = Math.floor((dx+maxR)/6);          // ~6px coherent patches
+      const h = hash(gi);
+      if(h < 0.32) continue;                        // gaps (~1/3 of the band missing)
+      const patchI = inten * (0.45 + 0.55*hash(gi+7));   // brightness varies patch to patch
+      const t = Math.max(0, Math.abs(dx)-HW);
+      const drop = slope*(Math.sqrt(t*t + corner*corner) - corner);   // rounded knee
+      const yc = O.y + r - drop;
+      const dyv = yc - O.y;
+      if(dyv <= 1) continue;                        // above the transducer
+      if(dx*dx + dyv*dyv > maxR*maxR) continue;     // stay inside the fan
+      const x = O.x + dx;
+      for(let k=0;k<prof.length;k++){
+        const [rr,gg,bb]=jetRGB(prof[k]*patchI);
+        ctx.fillStyle=`rgba(${rr},${gg},${bb},0.92)`;
+        ctx.fillRect(x, yc-4 + k, step, 1);
+      }
+    }
+  }
+  // sweep-persistence store for fish returns
+  let sonarPaint = [];        // {ang, r, col, sz} — held until the sweep passes again
+  let sonarPrevSweep = null;
+  function drawNetSounder(){
+    const bw=176, bh=104, x0=8, y0=H - bh - 8;       // lower-left corner
+    const O={x:x0+88, y:y0+18}, maxR=82, Rmax=40;    // 5 rings × 8 m/div
+    const rPix = m => (m/Rmax)*maxR;
+    const nwx = netWorldX(), bed = seabed(nwx);
+    const sbRange = bed - netTop;                     // headrope sounder → seabed
+    const a0=0, a1=Math.PI;                           // downward fan
+
+    // --- sweep + fish marks: a fish entering the beam is painted at the sweep's current
+    //     position, then fades slowly over a few seconds. ---
+    const sweep = Math.PI/2 + (Math.PI/2)*Math.sin(performance.now()/1000*0.7425);   // +35% sweep rate
+    const now = performance.now();
+    const FADE = 4200;                                       // ms — marks fade slowly
+    sonarPaint = sonarPaint.filter(p => now - p.t < FADE);   // drop fully-faded marks
+    for(let i=0;i<schools.length;i++){
+      const s=schools[i];
+      const rng = s.depth - netTop;
+      const inNet = s.biomass>0 && Math.abs(s.wx-nwx)<=11 && rng>=0 && rng<=NET_H;
+      if(inNet && !s.wasInNet){
+        const jv = clamp(0.18 + s.strength*0.4 + (Math.random()-0.5)*0.85, 0, 1);  // wide intensity spread
+        const [cr,cg,cb]=jetRGB(jv);
+        sonarPaint.push({ang:sweep, r:rPix(rng), col:`rgb(${cr},${cg},${cb})`, sz:1.6+s.strength*1.8, t:now});
+      }
+      s.wasInNet = inNet;
+    }
+    if(sonarPaint.length>240) sonarPaint.splice(0, sonarPaint.length-240);
+
+    ctx.save();
+    ctx.fillStyle='rgba(3,7,9,0.92)'; roundRectP(x0,y0,bw,bh,6); ctx.fill();
+    ctx.strokeStyle='rgba(127,240,200,0.35)'; ctx.lineWidth=1; roundRectP(x0,y0,bw,bh,6); ctx.stroke();
+    ctx.fillStyle='rgba(127,240,200,0.7)'; ctx.font='8px ui-monospace,monospace';
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('NET SOUNDER · FS70', x0+6, y0+10);
+    ctx.textAlign='right'; ctx.fillText('8 m/DIV', x0+bw-6, y0+10);
+    ctx.textAlign='left';
+
+    ctx.beginPath(); ctx.rect(x0,y0+13,bw,bh-14); ctx.clip();
+    // range rings + fan edge + centre beam
+    ctx.strokeStyle='rgba(120,200,170,0.16)'; ctx.lineWidth=1;
+    for(let m=8;m<=Rmax;m+=8){ ctx.beginPath(); ctx.arc(O.x,O.y,rPix(m),a0,a1); ctx.stroke(); }
+    ctx.strokeStyle='rgba(120,200,170,0.22)';
+    ctx.beginPath(); ctx.moveTo(O.x-maxR,O.y); ctx.lineTo(O.x+maxR,O.y); ctx.stroke();
+    ctx.strokeStyle='rgba(255,80,70,0.45)';
+    ctx.beginPath(); ctx.moveTo(O.x,O.y); ctx.lineTo(O.x,O.y+maxR); ctx.stroke();
+
+    // patchy reflectors: net bottom (footrope) and the seafloor
+    trapBand(O, rPix(NET_H), 0.85, maxR, 1);
+    const sbShown = sbRange>0 && sbRange<=Rmax;
+    if (sbShown) trapBand(O, rPix(sbRange), 1.0, maxR, 2);
+
+    // labels for the two returns
+    ctx.font='7px ui-monospace,monospace'; ctx.textBaseline='middle';
+    const netY = O.y+rPix(NET_H);
+    // NET — just above the net-bottom return, right of center
+    ctx.textAlign='left';
+    ctx.fillStyle='rgba(2,6,10,0.72)'; ctx.fillRect(O.x+6, netY-13, 20, 10);
+    ctx.fillStyle='rgba(230,255,245,0.95)'; ctx.fillText('NET', O.x+9, netY-8);
+    // SEABED — right side of the screen at the seafloor return
+    if (sbShown){
+      const sbY = O.y+rPix(sbRange), tw = 6*4.4+7;
+      ctx.textAlign='right';
+      ctx.fillStyle='rgba(2,6,10,0.72)'; ctx.fillRect(x0+bw-6-tw, sbY-5, tw, 10);
+      ctx.fillStyle='rgba(230,255,245,0.95)'; ctx.fillText('SEABED', x0+bw-9, sbY+0.5);
+      ctx.textAlign='left';
+    }
+
+    // fish marks — fade slowly with age
+    for(const p of sonarPaint){
+      ctx.globalAlpha = Math.max(0, 1 - (now - p.t)/FADE);
+      ctx.fillStyle=p.col;
+      ctx.beginPath(); ctx.arc(O.x+p.r*Math.cos(p.ang), O.y+p.r*Math.sin(p.ang), p.sz, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // slow radial sweep, back and forth
+    const sx=O.x+maxR*Math.cos(sweep), sy=O.y+maxR*Math.sin(sweep);
+    const grd=ctx.createLinearGradient(O.x,O.y,sx,sy);
+    grd.addColorStop(0,'rgba(190,255,225,0.5)'); grd.addColorStop(1,'rgba(190,255,225,0)');
+    ctx.strokeStyle=grd; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(O.x,O.y); ctx.lineTo(sx,sy); ctx.stroke();
+    ctx.restore();
+  }
+
+  function render(){
+    drawSky();
+    ctx.drawImage(echo, 0, SKY);
+    drawGridAndAxis();
+    drawColorbar();
+    drawDials();
+    drawNet();       // warps run up to the vessel
+    drawVessel();    // boat over the waterline, hull hides the warp ends
+    if (snagFlash>0){
+      ctx.fillStyle = `rgba(255,90,82,${snagFlash*0.28})`;
+      ctx.fillRect(0,SKY,W,H-SKY);
+    }
+    drawNetSounder();  // net-mounted downward sounder PIP, on top
+  }
+
+  // ---- HUD readouts ----
+  const el = id => document.getElementById(id);
+  const fmtTime = (s,dec) => {
+    const m = Math.floor(s/60);
+    const sec = s - m*60;
+    return m + ':' + (dec ? (sec<10?'0':'')+sec.toFixed(1) : String(Math.floor(sec)).padStart(2,'0'));
+  };
+  const rScore=el('rScore'), rBag=el('rBag'), rNet=el('rNet'), rBed=el('rBed'),
+        rInt=el('rInt'), intCell=el('integrityCell'), fnStatus=el('fnStatus'), fnPattern=el('fnPattern'), rTime=el('rTime');
+  function updateHUD(){
+    rScore.textContent = Math.floor(score);
+    rBag.innerHTML = quota+'<small> · '+(progress()*100|0)+'%</small>';
+    rNet.innerHTML = (netTop+NET_H/2).toFixed(0)+'<small>m</small>';
+    rBed.innerHTML = seabed(netWorldX()).toFixed(0)+'<small>m</small>';
+    rInt.innerHTML = (integrity|0)+'<small>%</small>';
+    intCell.className = 'cell' + (integrity<25?' danger':integrity<55?' warn':'');
+    rTime.textContent = fmtTime(towTime);
+    fnStatus.textContent = bottomContact ? 'BOTTOM CONTACT' : (score>0 ? 'ON THE FISH' : 'SEARCHING');
+    fnStatus.style.color = bottomContact ? 'var(--red)' : '';
+    const PLABEL = { SS1:'SS1 · adult scatter', SS2:'SS2 · juvenile columns', SS3:'SS3 · water clear' };
+    fnPattern.textContent = PLABEL[regime];
+  }
+
+  // ---- loop ----
+  let state = 'start';
+  let last = 0, colAccum = 0;
+
+  function frame(ts){
+    requestAnimationFrame(frame);
+    if (state !== 'playing'){ last = ts; return; }
+    let dt = (ts - last)/1000; last = ts;
+    if (dt > 0.1) dt = 0.1;   // clamp after tab-outs
+    towTime += dt;            // tow clock (only advances while playing)
+
+    // shift Pollock schooling pattern; SS3 is rarer and briefer
+    regimeTimer -= dt;
+    if (regimeTimer <= 0){ regime = pickRegime(regime); regimeTimer = regimeDuration(regime); }
+
+    // warp: haul in (net rises) / pay out (net sinks)
+    if (keys.warpUp)   warpDepth -= WARP_RATE*dt;
+    if (keys.warpDown) warpDepth += WARP_RATE*dt;
+    warpDepth = clamp(warpDepth, WD_MIN, WD_MAX);
+    // speed: faster / slower (light depth trim only)
+    if (keys.faster) setSpeed(speed + 1.4*dt);
+    if (keys.slower) setSpeed(speed - 1.4*dt);
+    // net's commanded depth = warp, trimmed a little by speed
+    targetTop = commandedTop();
+
+    // advance echogram by whole columns, at the current tow speed
+    colAccum += scrollPxFor() * dt;
+    let cols = colAccum|0; colAccum -= cols;
+    if (cols > 24) cols = 24;
+    if (cols > 0){
+      ectx.globalCompositeOperation='copy';
+      ectx.drawImage(echo, -cols, 0);
+      ectx.globalCompositeOperation='source-over';
+      for (let i=0;i<cols;i++) drawColumn(W-cols+i, worldX+i);
+      worldX += cols;
+      ensureSchools();
+    }
+
+    updateGear(dt);
+    snagFlash = Math.max(0, snagFlash - dt*2.2);
+
+    render();
+    updateHUD();
+  }
+  requestAnimationFrame(frame);
+
+  // ---- game state control ----
+  function rollQuota(){
+    quota = 400;                                              // constant quota
+    const b = document.getElementById('briefQuota');
+    if (b) b.textContent = quota;                              // show it in the briefing
+  }
+  let firstTow = true;
+  function reset(){
+    worldX = 0; spawnCursor = 0; schools.length = 0;
+    regime = Math.random()<0.5 ? 'SS1' : 'SS2';       // never open on empty water
+    regimeTimer = regimeDuration(regime);
+    ectx.fillStyle='#000'; ectx.fillRect(0,0,W,ECHO_H);
+    // pre-spawn across the first screen, then prime the pixels
+    while (spawnCursor < W + 220) spawnStep();
+    for (let x=0;x<W;x++){ drawColumn(x, x); }
+    worldX = W; ensureSchools();
+    speed = 2.6; warpDepth = 96; netTop = targetTop = commandedTop();
+    score = 0; integrity = 100; snagFlash = 0; towTime = 0;
+    sonarPaint = []; sonarPrevSweep = null;   // clear net-sonde persistence
+    updateHUD(); render();
+  }
+  function play(){
+    if (!firstTow) rollQuota();   // fresh quota each new tow; first tow keeps the briefed one
+    firstTow = false;
+    reset(); state='playing'; last=performance.now();
+    el('startScreen').classList.add('hidden'); el('overScreen').classList.add('hidden'); }
+  let lastOutcome = null, lastWasBest = false;
+  function endGame(reason){
+    state='over';
+    lastOutcome = reason;
+    const landed = Math.floor(score);
+    if (reason === 'win'){
+      lastWasBest = (bestTime===null || towTime < bestTime);
+      if (lastWasBest) bestTime = towTime;
+      el('overSub').textContent = 'Cod-end full';
+      el('overTitle').textContent = 'Quota landed!';
+      el('finalScore').textContent = 'Tow time \u2014 ' + fmtTime(towTime, true);
+      el('overMsg').textContent = landed + ' Pollock aboard · ' +
+        (lastWasBest ? 'New best time!' : 'Best ' + fmtTime(bestTime, true));
+      el('againBtn').textContent = 'Haul back \u2192';
+    } else {
+      el('overSub').textContent = 'Gear parted';
+      el('overTitle').textContent = 'The trawl is wrecked.';
+      el('finalScore').textContent = landed + ' / ' + quota + ' Pollock — tow lost';
+      el('overMsg').textContent = 'You dragged the footrope through the seabed one too many times. Keep the net off the bottom.';
+      el('againBtn').textContent = 'Shoot new gear';
+    }
+    el('overScreen').classList.remove('hidden');
+  }
+
+  el('startBtn').addEventListener('click', play);
+  el('againBtn').addEventListener('click', ()=>{
+    if (lastOutcome === 'win'){
+      // haul back → officer debrief / congratulations
+      el('congratsLine').textContent =
+        'You brought all ' + quota + ' Pollock over the rail in ' + fmtTime(towTime, true) +
+        ' without parting the gear' + (lastWasBest ? ' — a new session best!' : '.');
+      el('overScreen').classList.add('hidden');
+      el('congratsScreen').classList.remove('hidden');
+    } else {
+      play();
+    }
+  });
+  el('newTowBtn').addEventListener('click', ()=>{
+    el('congratsScreen').classList.add('hidden');
+    play();
+  });
+  el('briefBtn').addEventListener('click', ()=>{
+    el('introScreen').classList.add('hidden');
+    el('startScreen').classList.remove('hidden');
+  });
+
+  // ---- briefing crawl (JS-driven so it loops reliably at any canvas size) ----
+  (function(){
+    const scroller = el('crawlText');
+    const box = scroller && scroller.parentElement;   // .crawl window
+    let y = null, last = 0;
+    function tick(ts){
+      requestAnimationFrame(tick);
+      const intro = el('introScreen');
+      if (!scroller || !box || intro.classList.contains('hidden')){ y = null; last = ts; return; }
+      if (y === null){ y = box.clientHeight; last = ts; }      // start just below the window
+      const dt = Math.min(0.05, (ts - last)/1000); last = ts;
+      y -= 34 * dt;                                            // px/sec upward
+      if (y < -scroller.offsetHeight) y = box.clientHeight;    // loop
+      scroller.style.transform = 'translateY(' + y.toFixed(1) + 'px)';
+    }
+    requestAnimationFrame(tick);
+  })();
+
+  // ---- 8-bit NOAA Corps officer (static bust): lean, clean-cut, moustache ----
+  function drawOfficer(id){
+    const oc = el(id); if(!oc) return;
+    const o = oc.getContext('2d'); const P = 6, COLS = 26, ROWS = 35;
+    oc.width = COLS*P; oc.height = ROWS*P; o.imageSmoothingEnabled = false;
+    const px = (cx,cy,w,h,col)=>{ o.fillStyle=col; o.fillRect(cx*P,cy*P,w*P,h*P); };
+    const S = {
+      skin:'#e3ac82', skin2:'#c98e64', ear:'#d89a70',
+      hair:'#17140f', mous:'#17140f', mouth:'#7a4e3a',
+      capW:'#eef1f3', capW2:'#d3d9dd', brim:'#12161a', band:'#161d2a',
+      badge:'#d7b24a', badgeD:'#a8842f',
+      navy:'#1b2942', navy2:'#131f33', shirt:'#e9eef2', tie:'#22304a',
+      board:'#d7b24a', boardD:'#b8963a', white:'#f4f6f7', pupil:'#20303a'
+    };
+    // --- head / lean face ---
+    px(9,6,8,1,S.skin);                            // rounded crown
+    px(8,7,10,12,S.skin);                          // face rows 7-18
+    px(16,10,2,7,S.skin2);                         // cheek shadow (right)
+    px(9,18,8,1,S.skin2);                          // jaw shadow
+    px(7,12,1,3,S.ear); px(18,12,1,3,S.ear);       // ears
+    // --- black crew cut ---
+    px(9,5,8,1,S.hair);                            // flat top
+    px(8,6,10,1,S.hair); px(8,7,10,1,S.hair);      // crown + straight hairline
+    px(8,8,1,3,S.hair); px(17,8,1,3,S.hair);       // short sides
+    px(8,11,1,1,S.hair); px(17,11,1,1,S.hair);     // trimmed sideburns
+    px(9,11,3,1,S.hair); px(14,11,3,1,S.hair);     // brows
+    px(9,12,3,1,S.white); px(14,12,3,1,S.white);   // eye whites
+    px(10,12,1,1,S.pupil); px(15,12,1,1,S.pupil);  // pupils (glancing left)
+    px(12,13,2,3,S.skin); px(13,14,1,2,S.skin2);   // nose
+    px(11,15,1,1,S.skin2); px(14,15,1,1,S.skin2);  // nostrils
+    // moustache — trim, ends curling downward
+    px(9,16,8,1,S.mous); px(9,17,1,1,S.mous); px(16,17,1,1,S.mous);
+    px(11,17,4,1,S.mouth);                         // mouth
+    px(10,18,6,1,S.skin); px(11,19,4,1,S.skin); px(10,19,1,1,S.skin2); // chin
+    // --- neck ---
+    px(11,20,4,2,S.skin); px(11,21,1,1,S.skin2);
+    // --- service-dress-blue jacket ---
+    px(2,24,22,11,S.navy);                         // shoulders/torso
+    px(3,23,4,1,S.navy); px(19,23,4,1,S.navy);     // shoulder tops
+    px(10,22,6,1,S.shirt);                         // collar base
+    px(11,23,4,4,S.shirt); px(12,26,2,2,S.shirt);  // shirt V
+    px(9,23,2,4,S.navy2); px(15,23,2,4,S.navy2);   // jacket lapels
+    px(9,22,2,1,S.navy2); px(15,22,2,1,S.navy2);   // collar points
+    px(12,24,2,4,S.tie);                           // tie
+    // gold shoulder boards (officer)
+    px(3,23,4,1,S.board); px(3,24,4,1,S.boardD); px(4,23,1,1,S.badgeD);
+    px(19,23,4,1,S.board); px(19,24,4,1,S.boardD); px(21,23,1,1,S.badgeD);
+    // gold jacket buttons
+    px(13,29,1,1,S.board); px(13,31,1,1,S.board);
+  }
+  drawOfficer('officerCanvas');
+  drawOfficer('officerCanvas2');
+
+  // ---- input ----
+  const keys = { warpUp:false, warpDown:false, faster:false, slower:false };
+  window.addEventListener('keydown', e=>{
+    const k=e.key.toLowerCase();
+    if (k==='arrowup'||k==='w'){ keys.warpUp=true; e.preventDefault(); }
+    else if (k==='arrowdown'||k==='s'){ keys.warpDown=true; e.preventDefault(); }
+    else if (k==='arrowright'||k==='d'){ keys.faster=true; e.preventDefault(); }
+    else if (k==='arrowleft'||k==='a'){ keys.slower=true; e.preventDefault(); }
+    else if (k==='p'){ if(state==='playing'){state='paused';fnStatus.textContent='PAUSED';} else if(state==='paused'){state='playing';last=performance.now();} }
+  });
+  window.addEventListener('keyup', e=>{
+    const k=e.key.toLowerCase();
+    if (k==='arrowup'||k==='w') keys.warpUp=false;
+    if (k==='arrowdown'||k==='s') keys.warpDown=false;
+    if (k==='arrowright'||k==='d') keys.faster=false;
+    if (k==='arrowleft'||k==='a') keys.slower=false;
+  });
+
+  // touch / pointer SWIPE control:
+  //   vertical swipe  → warp (swipe up = haul in/raise, down = pay out/lower)
+  //   horizontal swipe → tow speed (right = faster, left = slower)
+  let dragId=null, lastX=0, lastY=0;
+  const WARP_SENS = 0.42;    // metres of net depth per px of vertical swipe
+  const SPEED_SENS = 0.013;  // knots per px of horizontal swipe
+  function dragStart(e){
+    if(state!=='playing' || dragId!==null) return;
+    dragId = e.pointerId; lastX = e.clientX; lastY = e.clientY;
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+  }
+  function dragMove(e){
+    if(e.pointerId !== dragId) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    warpDepth = clamp(warpDepth + dy*WARP_SENS, WD_MIN, WD_MAX);  // vertical → depth
+    setSpeed(speed + dx*SPEED_SENS);                              // horizontal → speed
+  }
+  function dragEnd(e){ if(e.pointerId === dragId) dragId = null; }
+  canvas.addEventListener('pointerdown', dragStart);
+  canvas.addEventListener('pointermove', dragMove);
+  window.addEventListener('pointerup', dragEnd);
+  window.addEventListener('pointercancel', dragEnd);
+
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden && state==='playing'){ state='paused'; fnStatus.textContent='PAUSED'; }
+  });
+
+  // paused loop still renders a static frame
+  (function idle(){
+    requestAnimationFrame(idle);
+    if (state==='paused'){ render(); }
+  })();
+
+  // initial priming so the console isn't black behind the start card
+  rollQuota();        // decide this tow's quota and print it into the briefing
+  reset();
+})();
+</script>
+<script>
+  // Scale the whole console to fit the viewport (preserve aspect, no scrollbars).
+  (function(){
+    const con = document.querySelector('.console');
+    function fit(){
+      con.style.transform = 'none';              // measure natural layout size
+      const w = con.offsetWidth, h = con.offsetHeight;
+      const s = Math.min((window.innerWidth - 8) / w, (window.innerHeight - 8) / h, 2.5);
+      con.style.transform = 'scale(' + s + ')';
+    }
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
+    window.addEventListener('load', fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+    fit();
+    setTimeout(fit, 150);
+  })();
+</script>
+</body>
+</html>
