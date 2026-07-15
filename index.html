@@ -34,7 +34,11 @@
     border-radius:14px;
     box-shadow:0 20px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.03);
     overflow:hidden;
+    /* game UI: never let a canvas drag start a text selection that spans the overlays */
+    user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none;
   }
+  .console ::selection{ background:transparent; }
+  .console ::-moz-selection{ background:transparent; }
   .topbar{
     display:flex;align-items:center;gap:14px;
     padding:10px 14px;border-bottom:1px solid var(--hair);
@@ -90,6 +94,63 @@
   button.start:active{transform:translateY(1px);}
   .final{color:var(--amber);font-size:15px;letter-spacing:.1em;margin:6px 0 2px;}
 
+  /* ---- haul-back button (in-game) ---- */
+  button.haul{
+    position:absolute; left:50%; transform:translateX(-50%); bottom:16px; z-index:5;
+    background:linear-gradient(180deg,#ffcf6b,#e8912f); color:#2b1704; border:0;
+    border-radius:10px; font-family:inherit; font-weight:700; letter-spacing:.12em;
+    padding:11px 18px; font-size:13px; cursor:pointer; text-transform:uppercase;
+    box-shadow:0 6px 18px rgba(232,145,47,.35); transition:transform .08s, filter .12s;
+  }
+  button.haul span{
+    display:inline-block; margin-left:8px; padding:1px 6px; border-radius:4px;
+    background:rgba(0,0,0,.22); font-size:11px;
+  }
+  button.haul:hover{ filter:brightness(1.08); }
+  button.haul:active{ transform:translateX(-50%) translateY(1px); }
+  button.haul.hidden{ display:none; }
+
+
+
+  /* ---- bycatch toast ---- */
+  .bytoast{
+    position:absolute; left:50%; top:16px; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    pointer-events:none; z-index:6;
+  }
+  .bycard{
+    display:flex; align-items:center; gap:9px;
+    background:rgba(4,12,16,.9); border:1px solid rgba(127,240,200,.45);
+    border-radius:10px; padding:6px 12px 6px 7px;
+    box-shadow:0 6px 20px rgba(0,0,0,.5);
+    animation:byIn .28s ease-out, byOut .5s ease-in 2.6s forwards;
+  }
+  .bycard canvas{ image-rendering:pixelated; display:block; }
+  .bycard .bt{ text-align:left; }
+  .bycard .bn{ color:#eafff6; font-size:12px; font-weight:600; letter-spacing:.04em; }
+  .bycard .bs{ color:var(--phos-dim); font-size:9px; letter-spacing:.16em; text-transform:uppercase; }
+  .bycard.newspec{ border-color:var(--amber); }
+  .bycard.newspec .bs{ color:var(--amber); }
+  @keyframes byIn{ from{ opacity:0; transform:translateY(-8px) scale(.96);} to{ opacity:1; } }
+  @keyframes byOut{ to{ opacity:0; transform:translateY(-6px); } }
+
+  /* ---- results ---- */
+  .verdict{ font-size:17px; font-weight:700; letter-spacing:.08em; margin:2px 0 6px; }
+  .verdict.good{ color:var(--phos); }
+  .verdict.over{ color:var(--red); }
+  .verdict.under{ color:var(--amber); }
+  .logbook{
+    display:flex; justify-content:center; gap:10px; flex-wrap:wrap;
+    margin:12px auto 4px; padding:9px 10px; max-width:460px;
+    border:1px solid var(--hair); border-radius:8px; background:rgba(2,10,14,.5);
+  }
+  .logbook .slot{ text-align:center; opacity:.5; filter:grayscale(1) brightness(.35); min-width:66px; }
+  .logbook .slot.have{ opacity:1; filter:none; }
+  .logbook .slot canvas{ image-rendering:pixelated; display:block; margin:0 auto; }
+  .logbook .slot .n{ color:#b8ccd0; font-size:8px; letter-spacing:.06em; margin-top:3px; }
+  .logbook .slot .c{ color:var(--phos); font-size:9px; font-weight:700; }
+  .logtitle{ color:var(--phos-dim); font-size:9px; letter-spacing:.2em; text-transform:uppercase; margin-top:10px; }
+
   /* ---- briefing intro ---- */
   #introScreen{ padding:0; }
   .introWrap{ display:flex; gap:14px; width:100%; height:100%; padding:20px 22px 60px; }
@@ -111,6 +172,16 @@
   .officer-cap{ margin-top:8px; color:var(--phos-dim); font-size:9px; letter-spacing:.2em; text-align:center; }
   .intro-btn{ position:absolute; bottom:16px; left:50%; transform:translateX(-50%); }
   .intro-btn:active{ transform:translateX(-50%) translateY(1px); }
+  .crawlhint{
+    position:absolute; bottom:22px; right:18px; z-index:4;
+    color:var(--phos-dim); font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+    display:flex; align-items:center; gap:5px;
+  }
+  .crawlhint kbd{
+    background:#0d1a20; border:1px solid var(--hair); border-bottom-color:#050b0e;
+    color:var(--phos); border-radius:4px; padding:2px 5px; font-size:10px;
+  }
+  .crawlhint span{ color:var(--phos); }
   /* static debrief text (congrats screen) */
   #congratsScreen .introWrap{ padding-bottom:64px; }
   .debrief{ flex:1 1 auto; align-self:center; max-height:100%; overflow:auto; padding-right:8px; }
@@ -131,21 +202,24 @@
   <div class="console">
     <div class="topbar">
       <div class="dot"></div>
-      <div class="brand"><b>SEAVIEW&nbsp;38</b><span>ECHOSOUNDER</span></div>
+      <div class="brand"><b>EK-80</b><span>ECHOSOUNDER</span></div>
       <div class="freq">38&nbsp;kHz · DOWN</div>
     </div>
 
     <div class="readouts">
-      <div class="cell"><div class="k">Landed</div><div class="v" id="rScore">0</div></div>
-      <div class="cell"><div class="k">Target</div><div class="v" id="rBag">—</div></div>
+      <div class="cell"><div class="k">Quota</div><div class="v" id="rBag">—</div></div>
       <div class="cell"><div class="k">Net depth</div><div class="v" id="rNet">—<small>m</small></div></div>
       <div class="cell"><div class="k">Seabed</div><div class="v" id="rBed">—<small>m</small></div></div>
       <div class="cell" id="integrityCell"><div class="k">Gear</div><div class="v" id="rInt">100<small>%</small></div></div>
+      <div class="cell"><div class="k">Bycatch</div><div class="v" id="rBy">0</div></div>
       <div class="cell"><div class="k">Time</div><div class="v" id="rTime">0:00</div></div>
     </div>
 
     <div class="stage">
       <canvas id="c" width="900" height="540"></canvas>
+
+      <button id="haulBtn" class="haul hidden">HAUL BACK <span>H</span></button>
+      <div id="byToast" class="bytoast"></div>
 
 <!--SCROLLING INTRO TEXT -->
 
@@ -155,14 +229,15 @@
             <div class="scroller" id="crawlText">
               <div class="brief-h">/// NOAA CORPS — OPERATIONS BRIEFING ///</div>
               <p>Good morning, Ensign. Welcome aboard.</p>
-              <p>We're running an acoustic-trawl survey for walleye <b>Pollock</b>. To control the net for our midwater trawl, use the Seaview 38 echsounder system to locate and capture fish.</p>
+              <p>We're running an acoustic-trawl survey for <b>pollock</b>. To control the net for our midwater trawl, use the EK-80 echosounder system to locate and capture fish.</p>
               <p>The echsounder will show you what is directly below <i>Oscar Dyson</i>.</p>
-              <p>Familiarize yourself with the trends you are likely to see..</p>
-	     <p><b>SS1:</b> a thin, scattered speckle of adults throughout the water column. There are fish to be caught, but it can take a while to fill the cod-end! </p>
+              <p>Familiarize yourself with the trends you are likely to see.</p>
+	     <p><b>SS1:</b> a thin, scattered speckle of adults throughout the water column.</p>
               <p><b>SS2:</b> tall bright ribbons of juveniles between 2-3 years old; drop the net on those and the net fills fast.</p>
               <p><b>SS3:</b> clear water. Keep searching.</p>
               <p>Fly the net on the <b>warp</b>: pay out wire to sink it, haul in to raise it. <b>Tow speed</b> only trims the depth — and decides how quickly the marks come at you.</p>
-              <p>The science team needs <span id="briefQuota">a quota</span> Pollock in the cod-end — and the clock is running, so land them <b>as fast as you can</b>. Keep the footrope off the bottom: plough the seabed and you'll part the gear, and the tow is lost.</p>
+              <p>The science team needs <span id="briefQuota">a quota</span> pollock — no more. Ensign: read your marks, use the warp strain gauge to judge what you've taken, and call <b>HAUL BACK</b> when you reckon you've made quota.</p>
+              <p>Keep the footrope off the bottom — plough the seabed and you'll part the gear, and the tow is lost with it.</p>
               <p>That's the job; good hunting.</p>
               <div class="brief-sig">— OFFICER OF THE DECK, NOAA CORPS</div>
             </div>
@@ -174,6 +249,7 @@
             <div class="officer-cap">OOD · NOAA CORPS</div>
           </div>
         </div>
+        <div class="crawlhint"><kbd>↑</kbd><kbd>↓</kbd> reading speed · <span id="crawlRate">8.5 px/s</span></div>
         <button class="start intro-btn" id="briefBtn">Report to station →</button>
       </div>
 
@@ -182,13 +258,14 @@
       <div class="overlay hidden" id="startScreen">
         <div class="card">
           <div class="sub">Pelagic Trawl Simulator</div>
-          <h1>Read the water. Set your net. Fill the bag.</h1>
-          <p>Set the net's depth mainly with the <b>warp</b> — pay out wire to lower it, haul in to raise it using the up/down arrows. </p>
-          <p>Change the <b>Tow speed</b> using the left/right arrows to adjust your scroll speed and trim the net elevation. The gear is heavy, so it answers the controls slowly. You'll need to plan ahead.</p>
-
+          <h1>Read the water. Judge the cod-end. Call the haul.</h1>
+          <p>Set the net's depth mainly with the <b>warp</b> — pay out wire to lower it, haul in to raise it using the up/down arrows. Change <b>Tow speed</b> with left/right to adjust scroll speed and trim the net. The gear is heavy and answers slowly — plan ahead.</p>
+          <p><b>There is no catch counter.</b> Judge your haul from the marks you work and the warp strain gauge, then hit <b>HAUL BACK</b>. Closest to quota without going over wins.</p>
+          
           <div class="keys">
             <span class="lbl">Warp — raise / lower net</span><kbd>↑</kbd><kbd>↓</kbd>
             <span class="lbl">Speed — slower / faster</span><kbd>←</kbd><kbd>→</kbd>
+            <span class="lbl">Haul back</span><kbd>H</kbd>
             <span class="lbl">or swipe ⇕ net / ⇔ speed ·</span><kbd>P</kbd><span class="lbl">pause</span>
           </div>
           <button class="start" id="startBtn">Shoot the net</button>
@@ -199,8 +276,11 @@
         <div class="card">
           <div class="sub" id="overSub">Gear parted</div>
           <h1 id="overTitle">The trawl is wrecked.</h1>
+          <div class="verdict" id="verdict"></div>
           <div class="final" id="finalScore">Catch landed: 0 Pollock</div>
           <p id="overMsg">You dragged the footrope through the seabed one too many times.</p>
+          <div class="logtitle" id="logTitle">Species logbook — this session</div>
+          <div class="logbook" id="logbook"></div>
           <button class="start" id="againBtn">Shoot new gear</button>
         </div>
       </div>
@@ -399,6 +479,127 @@
     if (schools.length > 400) schools = schools.filter(s => s.wx > worldX - 60);
   }
 
+  // ---- BYCATCH: rare Bering Sea species, collected as a session logbook ----
+  // wMid  = relative chance while fishing midwater
+  // wBed  = relative chance while the footrope is in contact with the bottom
+  const SPECIES = [
+    { id:'herring',    name:'Pacific Herring',   rarity:'common',    wMid:52, wBed:14, bonus:10 },
+    { id:'cod',        name:'Pacific Cod',       rarity:'common',    wMid:40, wBed:38, bonus:15 },
+    { id:'rockfish',   name:'Rockfish',          rarity:'uncommon',  wMid:5,  wBed:29, bonus:35 },
+    { id:'snailfish',  name:'Snailfish',         rarity:'rare',      wMid:2,  wBed:12, bonus:60 },
+    { id:'lumpsucker', name:'Lumpsucker',        rarity:'very rare', wMid:1,  wBed:7,  bonus:100 },
+  ];
+  const SPEC = Object.fromEntries(SPECIES.map(s=>[s.id,s]));
+  let logbook = {};              // id -> count, persists across tows this session
+  let towBycatch = [];           // ids caught this tow
+
+  // 8-bit icon painter: each species drawn from grid-aligned blocks
+  function drawSpeciesIcon(cv, id, P){
+    const g = cv.getContext('2d');
+    const COLS=22, ROWS=13;
+    cv.width=COLS*P; cv.height=ROWS*P; g.imageSmoothingEnabled=false;
+    g.clearRect(0,0,cv.width,cv.height);
+    const px=(x,y,w,h,c)=>{ g.fillStyle=c; g.fillRect(x*P,y*P,w*P,h*P); };
+    const eye=(x,y)=>{ px(x,y,1,1,'#f7fbfc'); px(x+1,y,1,1,'#101a1f'); };
+    if(id==='herring'){                       // slim, silver-blue, forked tail
+      const b='#9fc6dc', d='#6f9cb8', l='#e6f2f7';
+      px(6,5,11,3,b); px(7,4,8,1,b); px(7,8,8,1,b);
+      px(6,6,11,1,l);                          // lateral flash
+      px(8,4,6,1,d); px(8,8,6,1,d);
+      px(3,4,3,5,b); px(3,5,1,3,d);            // tail base
+      px(1,3,2,3,b); px(1,7,2,3,b);            // forked tail
+      px(17,5,2,3,b);                          // head
+      px(10,8,3,2,d); px(11,2,2,2,b);          // fins
+      eye(17,6);
+    } else if(id==='cod'){                     // stout, mottled brown, chin barbel
+      const b='#9a8156', d='#6f5b3a', l='#c3ab7e';
+      px(5,4,12,5,b); px(6,3,9,1,b); px(6,9,9,1,b);
+      px(6,4,10,1,l); px(7,7,8,1,d);
+      for(let i=0;i<5;i++) px(7+i*2,5,1,1,d);  // mottling
+      px(2,3,3,7,b); px(3,5,1,3,d);            // tail
+      px(17,4,2,4,b); px(18,7,1,2,b);          // head + barbel
+      px(8,2,4,1,d); px(13,2,3,1,d);           // dorsal fins
+      px(9,10,3,1,d);
+      eye(17,5);
+    } else if(id==='rockfish'){                // deep-bodied, red-orange, spiny dorsal
+      const b='#d1502f', d='#93321a', l='#f08a5c';
+      px(5,4,12,6,b); px(6,3,9,1,b);
+      px(6,4,9,1,l); px(6,9,10,1,d);
+      for(let i=0;i<6;i++) px(6+i*2,2,1,2,d);  // dorsal spines
+      px(2,3,3,8,b); px(3,6,1,3,d);            // tail
+      px(17,4,2,5,b);
+      px(9,10,4,1,d); px(15,7,2,3,d);          // fins
+      eye(17,5);
+    } else if(id==='snailfish'){               // gelatinous, pale pink, tadpole taper
+      const b='#e3aebc', d='#b87f92', l='#f6dbe3';
+      px(9,4,8,5,b); px(10,3,6,1,b); px(10,9,6,1,b);
+      px(10,4,6,1,l);
+      px(4,5,5,3,b); px(2,6,2,2,b);            // long tapering tail
+      px(9,6,8,1,d);
+      px(17,4,2,4,b);
+      px(11,9,4,1,d);
+      eye(17,5);
+    } else {                                   // lumpsucker: round, bumpy, teal, tiny fins
+      const b='#3f9c8f', d='#2a6d64', l='#7fd0c2';
+      px(7,3,9,8,b); px(8,2,7,1,b); px(8,11,7,1,b);
+      px(6,5,1,5,b); px(16,5,1,5,b);
+      px(8,3,6,1,l);
+      // tubercle bumps
+      px(9,4,1,1,l); px(12,4,1,1,l); px(14,6,1,1,l);
+      px(9,8,1,1,d); px(12,9,1,1,d); px(10,6,1,1,d);
+      px(4,5,2,4,b); px(4,6,1,2,d);            // stubby tail
+      px(10,12,4,1,d);                          // sucker disc
+      px(16,4,2,3,b);
+      eye(16,5);
+    }
+  }
+  function makeIcon(id, P){
+    const cv=document.createElement('canvas'); drawSpeciesIcon(cv,id,P); return cv;
+  }
+  // weighted draw, biased to demersal species when dragging bottom
+  function pickSpecies(onBottom){
+    let tot=0; for(const s of SPECIES) tot += onBottom ? s.wBed : s.wMid;
+    let r=Math.random()*tot;
+    for(const s of SPECIES){ r -= onBottom ? s.wBed : s.wMid; if(r<=0) return s; }
+    return SPECIES[0];
+  }
+  function showBycatchToast(sp, isNew){
+    const wrap=document.getElementById('byToast'); if(!wrap) return;
+    const card=document.createElement('div'); card.className='bycard'+(isNew?' newspec':'');
+    card.appendChild(makeIcon(sp.id,3));
+    const t=document.createElement('div'); t.className='bt';
+    t.innerHTML='<div class="bn">'+sp.name+'</div><div class="bs">'+
+                (isNew?'New species! ':'')+sp.rarity+' · +'+sp.bonus+'</div>';
+    card.appendChild(t); wrap.appendChild(card);
+    setTimeout(()=>card.remove(), 3200);
+  }
+  function catchBycatch(onBottom){
+    const sp = pickSpecies(onBottom);
+    const isNew = !logbook[sp.id];
+    logbook[sp.id] = (logbook[sp.id]||0) + 1;
+    towBycatch.push(sp.id);
+    showBycatchToast(sp, isNew);
+  }
+  function renderLogbook(){
+    const box=document.getElementById('logbook'); if(!box) return;
+    box.innerHTML='';
+    for(const sp of SPECIES){
+      const n=logbook[sp.id]||0;
+      const d=document.createElement('div');
+      d.className='slot'+(n?' have':'');
+      d.title = n ? sp.name+' — '+sp.rarity : 'Undiscovered';
+      // NOTE: append nodes only. Using innerHTML here would re-parse the element and
+      // wipe the canvas bitmaps, leaving blank icons.
+      d.appendChild(makeIcon(sp.id, 3));
+      const nm=document.createElement('div');
+      nm.className='n'; nm.textContent = n ? sp.name.split(' ').pop() : '???';
+      const ct=document.createElement('div');
+      ct.className='c'; ct.textContent = n ? '×'+n : '\u00a0';
+      d.appendChild(nm); d.appendChild(ct);
+      box.appendChild(d);
+    }
+  }
+
 
 <!-- SIDESCROLLING ECHOGRAM -->
 
@@ -513,6 +714,7 @@
 
     // catch: reflectors at the mouth column, overlapping the opening. Rate scales with how
     // much of the mouth the reflector fills, its echo strength, and its grab factor.
+    let fishingNow = false;
     for (let i=0;i<schools.length;i++){
       const s = schools[i];
       if (s.biomass <= 0) continue;
@@ -527,14 +729,20 @@
         const caught = Math.min(rate * dt, s.biomass);
         s.biomass -= caught;
         score += caught;
+        fishingNow = true;
       }
     }
 
-    // landed the quota → tow complete
-    if (score >= quota){ score = quota; endGame('win'); return; }
+    // NOTE: no auto-haul at quota — the skipper decides when to haul back.
 
     // bottom contact: footrope in or below the seabed tears the gear
     bottomContact = netBot > bed - 0.5;
+
+    // bycatch: occasional rare species. Dragging the bottom stirs up demersal fish,
+    // so it's both riskier and far more productive for rockfish / lumpsuckers.
+    const byRate = (bottomContact ? 0.13 : 0.016) + (fishingNow ? 0.008 : 0);   // expected per second
+    if (Math.random() < byRate*dt) catchBycatch(bottomContact);
+
     if (netBot > bed){
       integrity -= dt * 42;
       snagFlash = 1;
@@ -619,6 +827,111 @@
     dial(warpDial,  cy, R, warpFrac,    'WARP',  warpWire()+' m');
   }
 
+  // ---- steampunk warp-strain gauge (lower right) ----
+  // Reads tension on the warp: rises with the weight in the cod-end, but also with tow
+  // speed and sea state — so it's a feel for the bag, never an exact count.
+  let strainShown = 0, strainSeed = Math.random()*100;
+  function strainTrue(){
+    const load  = progress();                          // weight of fish aboard
+    const drag  = 0.20 + 0.26*speedFrac();             // hull/gear drag rises with speed
+    const dirt  = bottomContact ? 0.10 : 0;            // footrope in the mud snubs the wire
+    return clamp(drag + load*0.62 + dirt, 0, 1.12);
+  }
+  function updateStrain(dt){
+    const t = performance.now()/1000;
+    // surge: the wire breathes a little, but the needle stays readable
+    const flutter = 0.013*Math.sin(t*1.7 + strainSeed)
+                  + 0.007*Math.sin(t*4.1 + strainSeed*2.1)
+                  + 0.003*Math.sin(t*8.6 + strainSeed*0.7);
+    const target = strainTrue() + flutter;
+    strainShown += (target - strainShown) * Math.min(1, dt*3.2);   // needle inertia (damped)
+  }
+  function drawStrainGauge(){
+    const R = 54, cx = W - R - 14, cy = H - R - 14;
+    const a0 = Math.PI*0.78, sweep = Math.PI*1.44;     // needle travel
+    const f = clamp(strainShown, 0, 1.06);
+    ctx.save();
+
+    // brass bezel
+    const bez = ctx.createLinearGradient(cx-R, cy-R, cx+R, cy+R);
+    bez.addColorStop(0,'#d9ad63'); bez.addColorStop(0.35,'#8a6a33');
+    bez.addColorStop(0.6,'#e8c882'); bez.addColorStop(1,'#6f5326');
+    ctx.beginPath(); ctx.arc(cx,cy,R+7,0,7); ctx.fillStyle=bez; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,R+7,0,7); ctx.strokeStyle='rgba(40,26,10,0.85)'; ctx.lineWidth=1.5; ctx.stroke();
+    // rivets around the bezel
+    for(let i=0;i<8;i++){
+      const a=i*Math.PI/4 + 0.39, rx=cx+(R+3.4)*Math.cos(a), ry=cy+(R+3.4)*Math.sin(a);
+      ctx.beginPath(); ctx.arc(rx,ry,2.1,0,7); ctx.fillStyle='#f0d79a'; ctx.fill();
+      ctx.beginPath(); ctx.arc(rx+0.5,ry+0.5,1.1,0,7); ctx.fillStyle='rgba(70,48,18,0.75)'; ctx.fill();
+    }
+    // aged ivory face
+    const face = ctx.createRadialGradient(cx-R*0.3, cy-R*0.4, 3, cx, cy, R);
+    face.addColorStop(0,'#f6ecd2'); face.addColorStop(0.7,'#e3d3ad'); face.addColorStop(1,'#bda87c');
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fillStyle=face; ctx.fill();
+    ctx.strokeStyle='rgba(80,58,26,0.5)'; ctx.lineWidth=1; ctx.stroke();
+
+    // coloured strain arc: safe → working → danger
+    const band=(s,e,col)=>{ ctx.beginPath(); ctx.arc(cx,cy,R-7, a0+sweep*s, a0+sweep*e);
+      ctx.strokeStyle=col; ctx.lineWidth=4.5; ctx.stroke(); };
+    band(0,0.55,'rgba(90,120,70,0.55)');          // slack / working
+    band(0.55,0.8,'rgba(196,142,44,0.7)');        // heavy
+    band(0.8,1,'rgba(150,42,28,0.8)');            // overstrained
+
+    // tick marks (no numerals — the gauge is a feel, not a readout)
+    ctx.strokeStyle='rgba(60,42,18,0.8)';
+    for(let i=0;i<=20;i++){
+      const a=a0+sweep*(i/20), maj=(i%4===0);
+      const r1=R-11, r2=R-(maj?19:15);
+      ctx.lineWidth=maj?1.6:0.8;
+      ctx.beginPath();
+      ctx.moveTo(cx+r1*Math.cos(a), cy+r1*Math.sin(a));
+      ctx.lineTo(cx+r2*Math.cos(a), cy+r2*Math.sin(a));
+      ctx.stroke();
+    }
+    // engraved plate text — two lines, sized to sit inside the needle's blind gap
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    try{ ctx.letterSpacing='1px'; }catch(e){}
+    const engrave=(txt,yy,size)=>{
+      ctx.font='bold '+size+'px ui-monospace,monospace';
+      ctx.fillStyle='rgba(250,242,220,0.85)';                 // cut highlight
+      ctx.fillText(txt, cx+0.7, yy+0.7);
+      ctx.fillStyle='rgba(54,37,14,0.95)';                    // engraved face
+      ctx.fillText(txt, cx, yy);
+    };
+    engrave('WARP',   cy+R*0.30, 10);
+    engrave('STRAIN', cy+R*0.52, 10);
+    try{ ctx.letterSpacing='0px'; }catch(e){}
+
+    // needle (dark red, counterweighted)
+    const na = a0 + sweep*Math.min(f,1.06);
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(na);
+    ctx.beginPath(); ctx.moveTo(-9,-2.2); ctx.lineTo(0,-1.5); ctx.lineTo(R-13,-0.7);
+    ctx.lineTo(R-13,0.7); ctx.lineTo(0,1.5); ctx.lineTo(-9,2.2); ctx.closePath();
+    ctx.fillStyle='#8d2a1e'; ctx.fill();
+    ctx.beginPath(); ctx.arc(-9,0,3,0,7); ctx.fillStyle='#8d2a1e'; ctx.fill();
+    ctx.restore();
+    // brass hub
+    const hub=ctx.createLinearGradient(cx-5,cy-5,cx+5,cy+5);
+    hub.addColorStop(0,'#f0d79a'); hub.addColorStop(1,'#7a5a28');
+    ctx.beginPath(); ctx.arc(cx,cy,5,0,7); ctx.fillStyle=hub; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,1.6,0,7); ctx.fillStyle='rgba(50,34,12,0.8)'; ctx.fill();
+
+    // glass highlight
+    const gls=ctx.createLinearGradient(cx-R, cy-R, cx+R*0.3, cy+R*0.5);
+    gls.addColorStop(0,'rgba(255,255,255,0.22)'); gls.addColorStop(0.5,'rgba(255,255,255,0.05)');
+    gls.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fillStyle=gls; ctx.fill();
+
+    // red overstrain lamp when the wire is really loaded
+    if(f>0.8){
+      const pulse = 0.5+0.5*Math.sin(performance.now()/140);
+      ctx.beginPath(); ctx.arc(cx, cy+R+2, 3.2, 0, 7);
+      ctx.fillStyle='rgba(255,70,50,'+(0.35+0.6*pulse)+')'; ctx.fill();
+      ctx.strokeStyle='rgba(90,60,24,0.9)'; ctx.lineWidth=1; ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // ---- vessel: 8-bit NOAA fisheries survey ship (bow to the right, towing astern) ----
   const PS = 3, WLr = 21;               // pixel size; cell-row of the waterline
   const VES_LEFT = W - 183;             // screen x of the art's left edge
@@ -628,15 +941,43 @@
 
   function drawSky(){
     const g = ctx.createLinearGradient(0,0,0,SKY);
-    g.addColorStop(0, '#06121a');
-    g.addColorStop(1, '#0b2431');
+    g.addColorStop(0,   '#4c8fca');      // upper sky blue
+    g.addColorStop(0.55,'#82b6de');
+    g.addColorStop(1,   '#d3e7f2');      // pale haze at the horizon
     ctx.fillStyle = g; ctx.fillRect(0,0,W,SKY);
+
+    // sun with a soft glow
+    const sunX=W*0.60, sunY=SKY*0.40, sr=15;
+    const gl = ctx.createRadialGradient(sunX,sunY,2, sunX,sunY, sr*3.4);
+    gl.addColorStop(0,   'rgba(255,248,214,0.95)');
+    gl.addColorStop(0.35,'rgba(255,240,188,0.45)');
+    gl.addColorStop(1,   'rgba(255,240,188,0)');
+    ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(sunX,sunY,sr*3.4,0,7); ctx.fill();
+    ctx.fillStyle='#fff6d6'; ctx.beginPath(); ctx.arc(sunX,sunY,sr,0,7); ctx.fill();
+
+    // soft clouds
+    const cloud=(cx,cy,s)=>{
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.arc(cx,      cy,     11*s, 0,7);
+      ctx.arc(cx+13*s, cy+2*s,  8*s, 0,7);
+      ctx.arc(cx-13*s, cy+2*s,  8*s, 0,7);
+      ctx.arc(cx+4*s,  cy-6*s,  8*s, 0,7);
+      ctx.arc(cx-6*s,  cy-4*s,  7*s, 0,7);
+      ctx.fill();
+    };
+    cloud(W*0.30, SKY*0.64, 1.0);
+    cloud(W*0.50, SKY*0.28, 0.75);
+    cloud(W*0.68, SKY*0.72, 0.85);
+
     // waterline
-    ctx.strokeStyle = 'rgba(127,240,200,0.35)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, SKY+0.5); ctx.lineTo(W, SKY+0.5); ctx.stroke();
-    ctx.strokeStyle = 'rgba(127,240,200,0.10)';
-    ctx.beginPath(); ctx.moveTo(0, SKY+3.5); ctx.lineTo(W, SKY+3.5); ctx.stroke();
-    ctx.fillStyle = 'rgba(127,240,200,0.55)'; ctx.font='10px ui-monospace,monospace';
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,SKY+0.5); ctx.lineTo(W,SKY+0.5); ctx.stroke();
+    ctx.strokeStyle='rgba(120,180,210,0.25)';
+    ctx.beginPath(); ctx.moveTo(0,SKY+3.5); ctx.lineTo(W,SKY+3.5); ctx.stroke();
+
+    // 0 m label — dark for contrast against the bright sky
+    ctx.fillStyle='rgba(16,36,50,0.85)'; ctx.font='10px ui-monospace,monospace';
     ctx.textBaseline='middle'; ctx.fillText('0 m', 6, SKY-8);
   }
 
@@ -898,6 +1239,7 @@
       ctx.fillRect(0,SKY,W,H-SKY);
     }
     drawNetSounder();  // net-mounted downward sounder PIP, on top
+    drawStrainGauge(); // steampunk warp-strain gauge, lower right
   }
 
   // ---- HUD readouts ----
@@ -907,11 +1249,11 @@
     const sec = s - m*60;
     return m + ':' + (dec ? (sec<10?'0':'')+sec.toFixed(1) : String(Math.floor(sec)).padStart(2,'0'));
   };
-  const rScore=el('rScore'), rBag=el('rBag'), rNet=el('rNet'), rBed=el('rBed'),
+  const rBag=el('rBag'), rBy=el('rBy'), rNet=el('rNet'), rBed=el('rBed'),
         rInt=el('rInt'), intCell=el('integrityCell'), fnStatus=el('fnStatus'), fnPattern=el('fnPattern'), rTime=el('rTime');
   function updateHUD(){
-    rScore.textContent = Math.floor(score);
-    rBag.innerHTML = quota+'<small> · '+(progress()*100|0)+'%</small>';
+    rBag.innerHTML = quota+'<small> fish</small>';
+    rBy.textContent = towBycatch.length;
     rNet.innerHTML = (netTop+NET_H/2).toFixed(0)+'<small>m</small>';
     rBed.innerHTML = seabed(netWorldX()).toFixed(0)+'<small>m</small>';
     rInt.innerHTML = (integrity|0)+'<small>%</small>';
@@ -962,6 +1304,7 @@
     }
 
     updateGear(dt);
+    updateStrain(dt);
     snagFlash = Math.max(0, snagFlash - dt*2.2);
 
     render();
@@ -987,6 +1330,9 @@
     worldX = W; ensureSchools();
     speed = 2.6; warpDepth = 96; netTop = targetTop = commandedTop();
     score = 0; integrity = 100; snagFlash = 0; towTime = 0;
+    strainShown = 0; strainSeed = Math.random()*100;
+    towBycatch = [];
+    el('byToast').innerHTML = '';
     sonarPaint = []; sonarPrevSweep = null;   // clear net-sonde persistence
     updateHUD(); render();
   }
@@ -994,38 +1340,83 @@
     if (!firstTow) rollQuota();   // fresh quota each new tow; first tow keeps the briefed one
     firstTow = false;
     reset(); state='playing'; last=performance.now();
+    el('haulBtn').classList.remove('hidden');
     el('startScreen').classList.add('hidden'); el('overScreen').classList.add('hidden'); }
-  let lastOutcome = null, lastWasBest = false;
+  let lastOutcome = null, lastWasBest = false, lastAcc = 0;
+  function bycatchBonus(){ let b=0; for(const id of towBycatch) b += SPEC[id].bonus; return b; }
   function endGame(reason){
     state='over';
     lastOutcome = reason;
+    el('haulBtn').classList.add('hidden');
     const landed = Math.floor(score);
-    if (reason === 'win'){
-      lastWasBest = (bestTime===null || towTime < bestTime);
-      if (lastWasBest) bestTime = towTime;
-      el('overSub').textContent = 'Cod-end full';
-      el('overTitle').textContent = 'Quota landed!';
-      el('finalScore').textContent = 'Tow time \u2014 ' + fmtTime(towTime, true);
-      el('overMsg').textContent = landed + ' Pollock aboard · ' +
-        (lastWasBest ? 'New best time!' : 'Best ' + fmtTime(bestTime, true));
-      el('againBtn').textContent = 'Haul back \u2192';
+    const over = landed - quota;
+    const acc = quota ? landed/quota : 0;
+    lastAcc = acc;
+    const v = el('verdict');
+
+    if (reason === 'haul'){
+      const bonus = bycatchBonus();
+      const byTxt = towBycatch.length
+        ? towBycatch.length + ' bycatch · +' + bonus + ' bonus'
+        : 'no bycatch this tow';
+      if (over > 0){
+        // went over the quota — the tow is a bust
+        lastOutcome = 'over';
+        v.className='verdict over'; v.textContent = '✗ OVER QUOTA by ' + over;
+        el('overSub').textContent = 'Overfished';
+        el('overTitle').textContent = 'You went over.';
+        el('finalScore').textContent = landed + ' landed · quota was ' + quota;
+        el('overMsg').textContent = 'The excess has to be discarded and the tow is void. Haul back sooner next time. · ' + byTxt;
+        el('againBtn').textContent = 'Shoot new gear';
+      } else {
+        const short = -over;
+        let grade, cls='good';
+        if (short === 0)      grade = '★ PERFECT HAUL';
+        else if (acc >= 0.97) grade = '✓ EXCELLENT';
+        else if (acc >= 0.90) grade = '✓ GOOD HAUL';
+        else if (acc >= 0.75) grade = '· FAIR — light bag';
+        else { grade = '· POOR — mostly empty'; cls='under'; }
+        lastWasBest = (bestTime===null || towTime < bestTime);
+        if (lastWasBest && acc >= 0.90) bestTime = towTime;
+        v.className='verdict '+cls;
+        v.textContent = grade + '  (' + Math.round(acc*100) + '% of quota)';
+        el('overSub').textContent = 'Gear on deck';
+        el('overTitle').textContent = short===0 ? 'Right on the number.' : 'Haul back complete.';
+        el('finalScore').textContent = landed + ' / ' + quota + ' Pollock · ' + short + ' short · ' + fmtTime(towTime, true);
+        el('overMsg').textContent = byTxt;
+        el('againBtn').textContent = 'Haul back \u2192';
+      }
     } else {
+      v.className='verdict over'; v.textContent = '✗ GEAR LOST';
       el('overSub').textContent = 'Gear parted';
       el('overTitle').textContent = 'The trawl is wrecked.';
-      el('finalScore').textContent = landed + ' / ' + quota + ' Pollock — tow lost';
+      el('finalScore').textContent = 'Tow lost — the catch went with it';
       el('overMsg').textContent = 'You dragged the footrope through the seabed one too many times. Keep the net off the bottom.';
       el('againBtn').textContent = 'Shoot new gear';
     }
+    renderLogbook();
+    clearSelection();
     el('overScreen').classList.remove('hidden');
   }
+  function clearSelection(){
+    try{
+      const s = window.getSelection();
+      if (s){ s.removeAllRanges ? s.removeAllRanges() : s.empty && s.empty(); }
+    }catch(_){}
+  }
+  function haulBack(){ if (state==='playing') endGame('haul'); }
+  el('haulBtn').addEventListener('click', haulBack);
 
   el('startBtn').addEventListener('click', play);
   el('againBtn').addEventListener('click', ()=>{
-    if (lastOutcome === 'win'){
-      // haul back → officer debrief / congratulations
+    if (lastOutcome === 'haul'){
+      // good haul → officer debrief / congratulations
+      const landed = Math.floor(score), bonus = bycatchBonus();
+      const names = [...new Set(towBycatch)].map(id=>SPEC[id].name);
       el('congratsLine').textContent =
-        'You brought all ' + quota + ' Pollock over the rail in ' + fmtTime(towTime, true) +
-        ' without parting the gear' + (lastWasBest ? ' — a new session best!' : '.');
+        'You called the haul at ' + landed + ' of ' + quota + ' — ' + Math.round(lastAcc*100) +
+        '% of quota in ' + fmtTime(towTime, true) + '.' +
+        (names.length ? ' The sorting table also turned up ' + names.join(', ') + ' (+' + bonus + ' bonus).' : '');
       el('overScreen').classList.add('hidden');
       el('congratsScreen').classList.remove('hidden');
     } else {
@@ -1042,6 +1433,14 @@
   });
 
   // ---- briefing crawl (JS-driven so it loops reliably at any canvas size) ----
+  // ---- briefing crawl (JS-driven so it loops reliably at any canvas size) ----
+  let crawlSpeed = 8.5;                 // px/sec upward — adjustable with ↑/↓ during the briefing
+  const CRAWL_MIN = 2, CRAWL_MAX = 60;
+  function setCrawlSpeed(v){
+    crawlSpeed = clamp(v, CRAWL_MIN, CRAWL_MAX);
+    const h = el('crawlRate');
+    if (h) h.textContent = crawlSpeed.toFixed(1).replace(/\.0$/,'') + ' px/s';
+  }
   (function(){
     const scroller = el('crawlText');
     const box = scroller && scroller.parentElement;   // .crawl window
@@ -1052,7 +1451,7 @@
       if (!scroller || !box || intro.classList.contains('hidden')){ y = null; last = ts; return; }
       if (y === null){ y = box.clientHeight; last = ts; }      // start just below the window
       const dt = Math.min(0.05, (ts - last)/1000); last = ts;
-      y -= 34 * dt;                                            // px/sec upward
+      y -= crawlSpeed * dt;                                    // user-adjustable rate
       if (y < -scroller.offsetHeight) y = box.clientHeight;    // loop
       scroller.style.transform = 'translateY(' + y.toFixed(1) + 'px)';
     }
@@ -1114,12 +1513,19 @@
 
   // ---- input ----
   const keys = { warpUp:false, warpDown:false, faster:false, slower:false };
+  const introUp = () => !el('introScreen').classList.contains('hidden');
   window.addEventListener('keydown', e=>{
     const k=e.key.toLowerCase();
+    // while the briefing is on screen, ↑/↓ set the reading speed
+    if (introUp()){
+      if (k==='arrowup'||k==='w'){ setCrawlSpeed(crawlSpeed + 1.5); e.preventDefault(); return; }
+      if (k==='arrowdown'||k==='s'){ setCrawlSpeed(crawlSpeed - 1.5); e.preventDefault(); return; }
+    }
     if (k==='arrowup'||k==='w'){ keys.warpUp=true; e.preventDefault(); }
     else if (k==='arrowdown'||k==='s'){ keys.warpDown=true; e.preventDefault(); }
     else if (k==='arrowright'||k==='d'){ keys.faster=true; e.preventDefault(); }
     else if (k==='arrowleft'||k==='a'){ keys.slower=true; e.preventDefault(); }
+    else if (k==='h'){ haulBack(); }
     else if (k==='p'){ if(state==='playing'){state='paused';fnStatus.textContent='PAUSED';} else if(state==='paused'){state='playing';last=performance.now();} }
   });
   window.addEventListener('keyup', e=>{
@@ -1137,6 +1543,7 @@
   const WARP_SENS = 0.42;    // metres of net depth per px of vertical swipe
   const SPEED_SENS = 0.013;  // knots per px of horizontal swipe
   function dragStart(e){
+    e.preventDefault();                  // stop the browser starting a text selection
     if(state!=='playing' || dragId!==null) return;
     dragId = e.pointerId; lastX = e.clientX; lastY = e.clientY;
     try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
@@ -1166,6 +1573,7 @@
 
   // initial priming so the console isn't black behind the start card
   rollQuota();        // decide this tow's quota and print it into the briefing
+  setCrawlSpeed(crawlSpeed);   // show the starting reading speed on the briefing
   reset();
 })();
 </script>
@@ -1189,3 +1597,4 @@
 </script>
 </body>
 </html>
+    
