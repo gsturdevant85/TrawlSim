@@ -359,9 +359,9 @@
         <div class="introWrap">
           <div class="debrief">
             <div class="brief-h">/// NOAA CORPS — MISSION DEBRIEF ///</div>
-            <p>Outstanding tow, Ensign.</p>
+            <p id="debriefOpen">Outstanding tow, Ensign.</p>
             <p id="congratsLine">You brought the full quota over the gate without parting the gear.</p>
-            <p>The science team has their sample and we can get back on transit. That's exactly how it's done — clean, efficient, and on target.</p>
+            <p id="debriefClose">The science team has their sample and we can get back on transit. That's exactly how it's done — clean, efficient, and on target.</p>
             <div class="brief-sig">— OFFICER OF THE DECK, NOAA CORPS</div>
           </div>
           <div class="officerWrap">
@@ -1412,7 +1412,57 @@
     reset(); state='playing'; last=performance.now();
     el('haulBtn').classList.remove('hidden');
     el('startScreen').classList.add('hidden'); el('overScreen').classList.add('hidden'); }
-  let lastOutcome = null, lastWasBest = false, lastAcc = 0;
+  let lastOutcome = null, lastWasBest = false, lastAcc = 0, lastTier = 'good';
+
+  // ---- haul grading: one source of truth, used by the results card AND the debrief,
+  //      so the officer's tone can never contradict the grade on screen. ----
+  function haulTier(landed, q){
+    const short = q - landed, acc = q ? landed/q : 0;
+    if (short <= 0)  return 'perfect';
+    if (acc >= 0.97) return 'excellent';
+    if (acc >= 0.90) return 'good';
+    if (acc >= 0.75) return 'fair';
+    return 'poor';
+  }
+  const TIER_GRADE = {
+    perfect:   { txt:'★ PERFECT HAUL',        cls:'good'  },
+    excellent: { txt:'✓ EXCELLENT',           cls:'good'  },
+    good:      { txt:'✓ GOOD HAUL',           cls:'good'  },
+    fair:      { txt:'· FAIR — light bag',    cls:'good'  },
+    poor:      { txt:'· POOR — mostly empty', cls:'under' },
+  };
+  // The OOD's tone tracks the result: warm when it's earned, firm when it isn't —
+  // never scolding, and always pointing at the fix.
+  const DEBRIEF = {
+    perfect: {
+      open:  'Textbook, Ensign. Dead on the number.',
+      close: "I've watched skippers chase that figure a whole season and never touch it. Log it, and let's get back on transit."
+    },
+    excellent: {
+      open:  'Outstanding tow, Ensign.',
+      close: "The science team has their sample and we can get back on transit. That's exactly how it's done — clean, efficient, and on target."
+    },
+    good: {
+      open:  'Solid work, Ensign. That will do nicely.',
+      close: "Well inside tolerance and the gear came back whole. Hold your nerve a few seconds longer next time and you'll be dead on it."
+    },
+    fair: {
+      open:  "We'll take it, Ensign — but that bag came up light.",
+      close: "I'll be straight with you: you called the haul early. The team can work with this, though they shouldn't have to. Trust the strain gauge, let the needle climb, and give it longer on the marks. You've got the instincts — use them."
+    },
+    poor: {
+      open:  "That's a thin bag, Ensign. Not what the survey needs.",
+      close: "No dressing it up — we came a long way for that. But every skipper on this vessel has hauled short at least once, and none of them learned it from a lecture. Work the bright SS2 columns, keep the net on the marks, and let the needle climb toward the red before you call it. Shoot again and show me."
+    },
+    over: {
+      open:  'Over the mark, Ensign. We had to split the bag.',
+      close: "Everything past quota goes over the side, and that's dead fish for nothing — it fouls our numbers and it's a poor way to treat a stock we're out here to protect. Next tow, watch the needle reach the red and call it right there. Better a few short than a bag we have to dump. Go again."
+    },
+    gear: {
+      open:  "We lost the trawl, Ensign.",
+      close: "That's a new net and a good part of the ship's day, and I won't pretend otherwise. But you were hunting the bottom marks — that instinct is sound. The trick is riding just above them, not through them. Watch the FS70 and keep daylight between the net trace and the seabed trace. New gear's on deck. Shoot again."
+    },
+  };
   function bycatchBonus(){ let b=0; for(const id of towBycatch) b += SPEC[id].bonus; return b; }
   function endGame(reason){
     state='over';
@@ -1431,25 +1481,22 @@
         : 'no bycatch this tow';
       if (over > 0){
         // went over the quota — the tow is a bust
-        lastOutcome = 'over';
+        lastOutcome = 'over'; lastTier = 'over';
         v.className='verdict over'; v.textContent = '✗ OVER QUOTA by ' + over;
         el('overSub').textContent = 'Overfished';
         el('overTitle').textContent = 'You went over.';
         el('finalScore').textContent = landed + ' landed · quota was ' + quota;
         el('overMsg').textContent = 'The excess has to be split and is wasted. Haul back sooner next time. · ' + byTxt;
-        el('againBtn').textContent = 'Try again';
+        el('againBtn').textContent = 'Report to the bridge \u2192';
       } else {
         const short = -over;
-        let grade, cls='good';
-        if (short === 0)      grade = '★ PERFECT HAUL';
-        else if (acc >= 0.97) grade = '✓ EXCELLENT';
-        else if (acc >= 0.90) grade = '✓ GOOD HAUL';
-        else if (acc >= 0.75) grade = '· FAIR — light bag';
-        else { grade = '· POOR — mostly empty'; cls='under'; }
+        const tier = haulTier(landed, quota);
+        lastTier = tier;
+        const g = TIER_GRADE[tier];
         lastWasBest = (bestTime===null || towTime < bestTime);
         if (lastWasBest && acc >= 0.90) bestTime = towTime;
-        v.className='verdict '+cls;
-        v.textContent = grade + '  (' + Math.round(acc*100) + '% of quota)';
+        v.className='verdict '+g.cls;
+        v.textContent = g.txt + '  (' + Math.round(acc*100) + '% of quota)';
         el('overSub').textContent = 'Gear on deck';
         el('overTitle').textContent = short===0 ? 'Right on the number.' : 'Haul back complete.';
         el('finalScore').textContent = landed + ' / ' + quota + ' Pollock · ' + short + ' short · ' + fmtTime(towTime, true);
@@ -1457,12 +1504,13 @@
         el('againBtn').textContent = 'Haul back \u2192';
       }
     } else {
+      lastTier = 'gear';
       v.className='verdict over'; v.textContent = '✗ GEAR LOST';
       el('overSub').textContent = 'Gear parted';
       el('overTitle').textContent = 'The trawl is wrecked.';
       el('finalScore').textContent = 'Tow lost — the catch went with it';
       el('overMsg').textContent = 'You dragged the footrope through the seabed one too many times. Keep the net off the bottom.';
-      el('againBtn').textContent = 'Shoot new gear';
+      el('againBtn').textContent = 'Report to the bridge \u2192';
     }
     renderLogbook();
     clearSelection();
@@ -1479,19 +1527,48 @@
 
   el('startBtn').addEventListener('click', play);
   el('againBtn').addEventListener('click', ()=>{
-    if (lastOutcome === 'haul'){
-      // good haul → officer debrief / congratulations
-      const landed = Math.floor(score), bonus = bycatchBonus();
-      const names = [...new Set(towBycatch)].map(id=>SPEC[id].name);
-      el('congratsLine').textContent =
-        'You called the haul at ' + landed + ' of ' + quota + ' — ' + Math.round(lastAcc*100) +
-        '% of quota in ' + fmtTime(towTime, true) + '.' +
-        (names.length ? ' The sorting table also turned up ' + names.join(', ') + ' (+' + bonus + ' bonus).' : '');
-      el('overScreen').classList.add('hidden');
-      el('congratsScreen').classList.remove('hidden');
+    // every outcome now goes through the officer — the tone is matched to what happened
+    const landed = Math.floor(score), bonus = bycatchBonus();
+    const short = quota - landed, over = landed - quota;
+    const names = [...new Set(towBycatch)].map(id=>SPEC[id].name);
+    const d = DEBRIEF[lastTier] || DEBRIEF.good;
+
+    el('debriefOpen').textContent  = d.open;
+    el('debriefClose').textContent = d.close;
+
+    // middle line: the plain facts of the tow, phrased to fit the outcome
+    const pct = Math.round(lastAcc*100);
+    let mid;
+    if (lastTier === 'gear'){
+      mid = 'The footrope went through the seabed and the trawl parted after ' + fmtTime(towTime, true) +
+            ' on the wire. Whatever was in the bag — near enough ' + landed + ' fish — went to the bottom with it.';
+    } else if (lastTier === 'over'){
+      mid = 'You ran on to ' + landed + ' against a quota of ' + quota + ' — ' + over +
+            ' over, in ' + fmtTime(towTime, true) + '. Those extra fish are discards; they do not count for anything.';
+    } else if (lastTier === 'perfect'){
+      mid = 'You called it at exactly ' + landed + ' of ' + quota + ' — the full quota, in ' + fmtTime(towTime, true) +
+            ', and the gear came back without a scratch.';
+    } else if (lastTier === 'excellent' || lastTier === 'good'){
+      mid = 'You called the haul at ' + landed + ' of ' + quota + ' — ' + pct + '% of quota, ' + short +
+            ' shy, in ' + fmtTime(towTime, true) + '.';
     } else {
-      play();
+      mid = 'You called the haul at ' + landed + ' of ' + quota + ' — only ' + pct + '% of quota. That is ' + short +
+            ' fish we did not bring home, after ' + fmtTime(towTime, true) + ' on the wire.';
     }
+    if (names.length){
+      if (lastTier === 'gear'){
+        mid += ' At least the ' + names.join(', ') + ' made it to the sorting table before we lost her (+' + bonus + ' bonus).';
+      } else if (lastTier === 'fair' || lastTier === 'poor' || lastTier === 'over'){
+        mid += ' The sorting table did turn up ' + names.join(', ') + ' (+' + bonus + ' bonus) — the one bright spot.';
+      } else {
+        mid += ' The sorting table also turned up ' + names.join(', ') + ' (+' + bonus + ' bonus).';
+      }
+    }
+    el('congratsLine').textContent = mid;
+    el('newTowBtn').textContent = (lastTier === 'gear') ? 'Shoot new gear \u2192' : 'Fish again \u2192';
+
+    el('overScreen').classList.add('hidden');
+    el('congratsScreen').classList.remove('hidden');
   });
   el('newTowBtn').addEventListener('click', ()=>{
     el('congratsScreen').classList.add('hidden');
