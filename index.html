@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,6 +18,32 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;}
+  html{ overscroll-behavior:none; }
+  body{ overscroll-behavior:none; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+
+  /* ---- rotate-to-landscape gate (portrait phones only) ---- */
+  #rotateGate{
+    display:none; position:fixed; inset:0; z-index:99;
+    background:radial-gradient(700px 500px at 50% 40%, #12232b, #060d11 70%);
+    align-items:center; justify-content:center; text-align:center; padding:28px;
+  }
+  #rotateGate.show{ display:flex; }
+  .rg-inner h2{ color:var(--ink); font-size:19px; letter-spacing:.06em; margin:16px 0 6px; font-weight:600; }
+  .rg-inner p{ color:#8fa8ad; font-size:13px; line-height:1.6; margin:0; }
+  .rg-inner svg{ animation:rgTurn 2.4s ease-in-out infinite; }
+  @keyframes rgTurn{ 0%,45%{transform:rotate(0)} 70%,100%{transform:rotate(-90deg)} }
+
+  /* ---- touch devices: scale targets up so they survive the fit-scale ---- */
+  @media (pointer: coarse){
+    button.haul{ padding:26px 34px; font-size:20px; border-radius:14px; }
+    button.haul span{ font-size:16px; padding:2px 8px; }
+    button.start{ padding:22px 38px; font-size:18px; }
+    .cell .k{ font-size:11px; }
+    .cell .v{ font-size:21px; }
+    .card p{ font-size:15px; line-height:1.65; }
+    .crawl p{ font-size:16px; }
+    .footnote{ display:none; }          /* reclaim height for the canvas */
+  }
   body{
     background:
       radial-gradient(1200px 600px at 50% -10%, #12232b 0%, var(--deck) 60%),
@@ -110,8 +137,6 @@
   button.haul:active{ transform:translateX(-50%) translateY(1px); }
   button.haul.hidden{ display:none; }
 
-
-
   /* ---- bycatch toast ---- */
   .bytoast{
     position:absolute; left:50%; top:16px; transform:translateX(-50%);
@@ -175,13 +200,20 @@
   .crawlhint{
     position:absolute; bottom:22px; right:18px; z-index:4;
     color:var(--phos-dim); font-size:9px; letter-spacing:.14em; text-transform:uppercase;
-    display:flex; align-items:center; gap:5px;
+    display:flex; align-items:center; gap:6px;
   }
-  .crawlhint kbd{
-    background:#0d1a20; border:1px solid var(--hair); border-bottom-color:#050b0e;
-    color:var(--phos); border-radius:4px; padding:2px 5px; font-size:10px;
+  .crawlbtn{
+    background:#0d1a20; border:1px solid var(--hair); color:var(--phos);
+    border-radius:5px; width:26px; height:26px; font-size:15px; line-height:1;
+    font-family:inherit; cursor:pointer; padding:0;
   }
-  .crawlhint span{ color:var(--phos); }
+  .crawlbtn:active{ background:#16303a; }
+  .crawlhint .lbl2{ color:var(--phos-dim); }
+  .crawlhint span#crawlRate{ color:var(--phos); }
+  @media (pointer: coarse){
+    .crawlbtn{ width:56px; height:56px; font-size:26px; }
+    .crawlhint{ font-size:11px; gap:9px; }
+  }
   /* static debrief text (congrats screen) */
   #congratsScreen .introWrap{ padding-bottom:64px; }
   .debrief{ flex:1 1 auto; align-self:center; max-height:100%; overflow:auto; padding-right:8px; }
@@ -199,6 +231,19 @@
 </style>
 </head>
 <body>
+  <div id="rotateGate">
+    <div class="rg-inner">
+      <svg viewBox="0 0 64 64" width="72" height="72" aria-hidden="true">
+        <rect x="20" y="6" width="24" height="42" rx="3" fill="none" stroke="#7ff0c8" stroke-width="2.5"/>
+        <line x1="27" y1="11" x2="37" y2="11" stroke="#7ff0c8" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="32" cy="43" r="1.6" fill="#7ff0c8"/>
+        <path d="M10 54 a 22 22 0 0 0 44 0" fill="none" stroke="#ffb454" stroke-width="2.5" stroke-dasharray="4 3"/>
+        <path d="M52 47 l4 7 -8 1 z" fill="#ffb454"/>
+      </svg>
+      <h2>Rotate your device</h2>
+      <p>The trawl console needs landscape.<br>Turn your phone sideways to take the watch.</p>
+    </div>
+  </div>
   <div class="console">
     <div class="topbar">
       <div class="dot"></div>
@@ -229,15 +274,15 @@
             <div class="scroller" id="crawlText">
               <div class="brief-h">/// NOAA CORPS — OPERATIONS BRIEFING ///</div>
               <p>Good morning, Ensign. Welcome aboard.</p>
-              <p>We're running an acoustic-trawl survey for <b>pollock</b>. To control the net for our midwater trawl, use the EK-80 echosounder system to locate and capture fish.</p>
+              <p>We're running an acoustic-trawl survey for walleye <b>Pollock</b>. To control the net for our midwater trawl, use the EK-80 echosounder system to locate and capture fish.</p>
               <p>The echsounder will show you what is directly below <i>Oscar Dyson</i>.</p>
-              <p>Familiarize yourself with the trends you are likely to see.</p>
-	     <p><b>SS1:</b> a thin, scattered speckle of adults throughout the water column.</p>
+              <p>Familiarize yourself with the trends you are likely to see..</p>
+	     <p><b>SS1:</b> a thin, scattered speckle of adults throughout the water column. There are fish to be caught, but it can take a while to fill the cod-end! </p>
               <p><b>SS2:</b> tall bright ribbons of juveniles between 2-3 years old; drop the net on those and the net fills fast.</p>
               <p><b>SS3:</b> clear water. Keep searching.</p>
               <p>Fly the net on the <b>warp</b>: pay out wire to sink it, haul in to raise it. <b>Tow speed</b> only trims the depth — and decides how quickly the marks come at you.</p>
-              <p>The science team needs <span id="briefQuota">a quota</span> pollock — no more. Ensign: read your marks, use the warp strain gauge to judge what you've taken, and call <b>HAUL BACK</b> when you reckon you've made quota.</p>
-              <p>Keep the footrope off the bottom — plough the seabed and you'll part the gear, and the tow is lost with it.</p>
+              <p>The science team needs <span id="briefQuota">a quota</span> Pollock — no more. You'll have <b>no counter on the bag</b>, Ensign: read your marks, judge what you've taken, and call <b>HAUL BACK</b> when you reckon you're on the number. Closest without going over wins; go over and the tow is void.</p>
+              <p>Keep the footrope off the bottom — plough the seabed and you'll part the gear, and the tow is lost with it. Mind you, a net that kisses the bottom stirs up <b>rockfish and lumpsuckers</b>. Anything odd on the sorting table gets logged for the science team.</p>
               <p>That's the job; good hunting.</p>
               <div class="brief-sig">— OFFICER OF THE DECK, NOAA CORPS</div>
             </div>
@@ -249,7 +294,12 @@
             <div class="officer-cap">OOD · NOAA CORPS</div>
           </div>
         </div>
-        <div class="crawlhint"><kbd>↑</kbd><kbd>↓</kbd> reading speed · <span id="crawlRate">8.5 px/s</span></div>
+        <div class="crawlhint">
+          <button class="crawlbtn" id="crawlSlower" aria-label="Slower">−</button>
+          <button class="crawlbtn" id="crawlFaster" aria-label="Faster">+</button>
+          <span class="lbl2">reading speed</span>
+          <span id="crawlRate">8.5 px/s</span>
+        </div>
         <button class="start intro-btn" id="briefBtn">Report to station →</button>
       </div>
 
@@ -258,10 +308,11 @@
       <div class="overlay hidden" id="startScreen">
         <div class="card">
           <div class="sub">Pelagic Trawl Simulator</div>
-          <h1>Read the water. Judge the cod-end. Call the haul.</h1>
+          <h1>Read the water. Judge the codend. Call the haul.</h1>
           <p>Set the net's depth mainly with the <b>warp</b> — pay out wire to lower it, haul in to raise it using the up/down arrows. Change <b>Tow speed</b> with left/right to adjust scroll speed and trim the net. The gear is heavy and answers slowly — plan ahead.</p>
-          <p><b>There is no catch counter.</b> Judge your haul from the marks you work and the warp strain gauge, then hit <b>HAUL BACK</b>. Closest to quota without going over wins.</p>
-          
+          <p><b>There is no catch counter.</b> Judge your haul from the marks you work and the feel of the cod-end, then hit <b>HAUL BACK</b>. Closest to quota without going over wins. Scrape the bottom and you risk the gear — but that's where the odd <b>rockfish or lumpsucker</b> turns up for the logbook.</p>
+          <p>Your best read on the bag is the brass <b>WARP STRAIN</b> gauge — the weight of fish drags on the wire, so the needle climbs into the amber and red as the cod-end loads up.
+
           <div class="keys">
             <span class="lbl">Warp — raise / lower net</span><kbd>↑</kbd><kbd>↓</kbd>
             <span class="lbl">Speed — slower / faster</span><kbd>←</kbd><kbd>→</kbd>
@@ -1366,8 +1417,8 @@
         el('overSub').textContent = 'Overfished';
         el('overTitle').textContent = 'You went over.';
         el('finalScore').textContent = landed + ' landed · quota was ' + quota;
-        el('overMsg').textContent = 'The excess has to be discarded and the tow is void. Haul back sooner next time. · ' + byTxt;
-        el('againBtn').textContent = 'Shoot new gear';
+        el('overMsg').textContent = 'The excess has to be split and cannot be used. Haul back sooner next time. · ' + byTxt;
+        el('againBtn').textContent = 'Try again';
       } else {
         const short = -over;
         let grade, cls='good';
@@ -1431,6 +1482,8 @@
     el('introScreen').classList.add('hidden');
     el('startScreen').classList.remove('hidden');
   });
+  el('crawlFaster').addEventListener('click', ()=> setCrawlSpeed(crawlSpeed + 1.5));
+  el('crawlSlower').addEventListener('click', ()=> setCrawlSpeed(crawlSpeed - 1.5));
 
   // ---- briefing crawl (JS-driven so it loops reliably at any canvas size) ----
   // ---- briefing crawl (JS-driven so it loops reliably at any canvas size) ----
@@ -1581,20 +1634,46 @@
   // Scale the whole console to fit the viewport (preserve aspect, no scrollbars).
   (function(){
     const con = document.querySelector('.console');
+    const gate = document.getElementById('rotateGate');
     function fit(){
-      con.style.transform = 'none';              // measure natural layout size
+      // visualViewport tracks the real visible area on mobile (address-bar collapse etc.)
+      const vv = window.visualViewport;
+      const vw = Math.round(vv ? vv.width  : window.innerWidth);
+      const vh = Math.round(vv ? vv.height : window.innerHeight);
+
+      // Portrait phones can't show a landscape console legibly — ask for a rotate.
+      const portrait = vh > vw;
+      const smallSide = Math.min(vw, vh);
+      const needRotate = portrait && smallSide < 700;   // phones only; tablets are fine
+      gate.classList.toggle('show', needRotate);
+      if (needRotate) return;                           // don't bother scaling behind the gate
+
+      con.style.transform = 'none';                     // measure natural layout size
       const w = con.offsetWidth, h = con.offsetHeight;
-      const s = Math.min((window.innerWidth - 8) / w, (window.innerHeight - 8) / h, 2.5);
+      const s = Math.min((vw - 8) / w, (vh - 8) / h, 2.5);
       con.style.transform = 'scale(' + s + ')';
     }
     window.addEventListener('resize', fit);
-    window.addEventListener('orientationchange', fit);
+    window.addEventListener('orientationchange', ()=>{ fit(); setTimeout(fit, 250); });
     window.addEventListener('load', fit);
+    if (window.visualViewport){
+      window.visualViewport.addEventListener('resize', fit);
+      window.visualViewport.addEventListener('scroll', fit);
+    }
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
     fit();
     setTimeout(fit, 150);
+
+    // iOS Safari ignores user-scalable=no — block pinch/double-tap zoom explicitly
+    ['gesturestart','gesturechange','gestureend'].forEach(ev =>
+      document.addEventListener(ev, e => e.preventDefault(), { passive:false }));
+    let lastTouch = 0;
+    document.addEventListener('touchend', e => {
+      const now = Date.now();
+      if (now - lastTouch <= 300) e.preventDefault();   // double-tap zoom
+      lastTouch = now;
+    }, { passive:false });
   })();
 </script>
 </body>
 </html>
-    
