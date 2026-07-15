@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -37,10 +36,13 @@
   @media (pointer: coarse){
     button.haul{ padding:26px 34px; font-size:20px; border-radius:14px; }
     button.haul span{ font-size:16px; padding:2px 8px; }
-    button.start{ padding:22px 38px; font-size:18px; }
+    button.start{ padding:18px 32px; font-size:16px; }
     .cell .k{ font-size:11px; }
     .cell .v{ font-size:21px; }
-    .card p{ font-size:15px; line-height:1.65; }
+    .card h1{ font-size:19px; margin-bottom:2px; }
+    .card .sub{ margin-bottom:10px; }
+    .card p{ font-size:13.5px; line-height:1.5; margin:7px 0; }
+    .keys{ margin:10px 0 14px; }
     .crawl p{ font-size:16px; }
     .footnote{ display:none; }          /* reclaim height for the canvas */
   }
@@ -100,6 +102,22 @@
     text-align:center;padding:24px;
   }
   .overlay.hidden{display:none;}
+  /* Card screens can outgrow the stage (esp. with larger touch fonts) — let them scroll.
+     align-items:flex-start + margin:auto keeps the card centred when it fits, but still
+     scrollable from the top when it doesn't (align-items:center would clip the top). */
+  #startScreen, #overScreen{
+    align-items:flex-start;
+    overflow-y:auto; overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    overscroll-behavior:contain;
+  }
+  #startScreen .card, #overScreen .card{ margin:auto; }
+  #startScreen::-webkit-scrollbar, #overScreen::-webkit-scrollbar{ width:8px; }
+  #startScreen::-webkit-scrollbar-thumb, #overScreen::-webkit-scrollbar-thumb{
+    background:rgba(127,240,200,.28); border-radius:4px;
+  }
+  #startScreen::-webkit-scrollbar-track, #overScreen::-webkit-scrollbar-track{ background:transparent; }
   .card{max-width:520px;}
   .card h1{
     font-size:22px;letter-spacing:.06em;margin:0 0 4px;color:var(--ink);font-weight:600;
@@ -274,16 +292,17 @@
             <div class="scroller" id="crawlText">
               <div class="brief-h">/// NOAA CORPS — OPERATIONS BRIEFING ///</div>
               <p>Good morning, Ensign. Welcome aboard.</p>
-              <p>We're running an acoustic-trawl survey for walleye <b>Pollock</b>. To control the net for our midwater trawl, use the EK-80 echosounder system to locate and capture fish.</p>
+              <p>We're running an acoustic-trawl survey for <b>pollock</b>. To control the net for our midwater trawl, use the EK-80 echosounder system to locate and capture fish.</p>
               <p>The echsounder will show you what is directly below <i>Oscar Dyson</i>.</p>
-              <p>Familiarize yourself with the trends you are likely to see..</p>
+              <p>Familiarize yourself with the trends you are likely to see.</p>
 	     <p><b>SS1:</b> a thin, scattered speckle of adults throughout the water column. There are fish to be caught, but it can take a while to fill the cod-end! </p>
               <p><b>SS2:</b> tall bright ribbons of juveniles between 2-3 years old; drop the net on those and the net fills fast.</p>
               <p><b>SS3:</b> clear water. Keep searching.</p>
               <p>Fly the net on the <b>warp</b>: pay out wire to sink it, haul in to raise it. <b>Tow speed</b> only trims the depth — and decides how quickly the marks come at you.</p>
-              <p>The science team needs <span id="briefQuota">a quota</span> Pollock — no more. You'll have <b>no counter on the bag</b>, Ensign: read your marks, judge what you've taken, and call <b>HAUL BACK</b> when you reckon you're on the number. Closest without going over wins; go over and the tow is void.</p>
-              <p>Keep the footrope off the bottom — plough the seabed and you'll part the gear, and the tow is lost with it. Mind you, a net that kisses the bottom stirs up <b>rockfish and lumpsuckers</b>. Anything odd on the sorting table gets logged for the science team.</p>
-              <p>That's the job; good hunting.</p>
+              <p>The science team needs <span id="briefQuota">a quota</span> pollock — no more. You'll have <b>no counter on the codend</b>, Ensign: Call <b>HAUL BACK</b> when you reckon you're on the number. Closest without going over wins; go over and the tow is void.</p>
+              <p>Keep the footrope off the bottom — plough the seabed and you'll part the gear, and the tow is lost with it.</p>
+              <p>Good hunting.</p>
+
               <div class="brief-sig">— OFFICER OF THE DECK, NOAA CORPS</div>
             </div>
             <div class="crawl-fade-top"></div>
@@ -308,10 +327,10 @@
       <div class="overlay hidden" id="startScreen">
         <div class="card">
           <div class="sub">Pelagic Trawl Simulator</div>
-          <h1>Read the water. Judge the codend. Call the haul.</h1>
+          <h1>Read the water. Judge the bag. Call the haul.</h1>
           <p>Set the net's depth mainly with the <b>warp</b> — pay out wire to lower it, haul in to raise it using the up/down arrows. Change <b>Tow speed</b> with left/right to adjust scroll speed and trim the net. The gear is heavy and answers slowly — plan ahead.</p>
-          <p><b>There is no catch counter.</b> Judge your haul from the marks you work and the feel of the cod-end, then hit <b>HAUL BACK</b>. Closest to quota without going over wins. Scrape the bottom and you risk the gear — but that's where the odd <b>rockfish or lumpsucker</b> turns up for the logbook.</p>
-          <p>Your best read on the bag is the brass <b>WARP STRAIN</b> gauge — the weight of fish drags on the wire, so the needle climbs into the amber and red as the cod-end loads up.
+          <p><b>There is no catch counter.</b> Judge your haul from the backscatter you work and the feel of the cod-end, then hit <b>HAUL BACK</b>. Closest to quota without going over wins.</p>
+          <p>Your best read on the bag is the brass <b>WARP STRAIN</b> gauge — the weight of fish drags on the wire, so the needle climbs into the amber and red as the cod-end loads up.</p>
 
           <div class="keys">
             <span class="lbl">Warp — raise / lower net</span><kbd>↑</kbd><kbd>↓</kbd>
@@ -1417,7 +1436,7 @@
         el('overSub').textContent = 'Overfished';
         el('overTitle').textContent = 'You went over.';
         el('finalScore').textContent = landed + ' landed · quota was ' + quota;
-        el('overMsg').textContent = 'The excess has to be split and cannot be used. Haul back sooner next time. · ' + byTxt;
+        el('overMsg').textContent = 'The excess has to be split and is wasted. Haul back sooner next time. · ' + byTxt;
         el('againBtn').textContent = 'Try again';
       } else {
         const short = -over;
